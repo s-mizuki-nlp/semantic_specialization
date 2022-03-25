@@ -18,7 +18,7 @@ class CosineSimilarity(nn.Module):
         self._temperature = temperature
         self._cosine = nn.CosineSimilarity(dim=-1)
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor):
+    def forward(self, x: torch.Tensor, y: torch.Tensor, **kwargs):
         return self._cosine(x, y) / self._temperature
 
 
@@ -31,7 +31,7 @@ class DotProductSimilarity(nn.Module):
         super().__init__()
         self._temperature = temperature
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor):
+    def forward(self, x: torch.Tensor, y: torch.Tensor, **kwargs):
         return torch.sum(x*y, dim=-1) / self._temperature
 
 
@@ -54,7 +54,7 @@ class ArcMarginProduct(nn.Module):
         self.th = math.cos(math.pi - margin)
         self.mm = math.sin(math.pi - margin) * margin
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor, is_hard_examples: bool):
+    def forward(self, x: torch.Tensor, y: torch.Tensor, is_hard_examples: bool, **kwargs):
         cos_theta = cosine_similarity(x, y, dim=-1)
         sin_theta = torch.sqrt((1.0 - torch.pow(cos_theta, 2)).clamp(0, 1))
         # phi = cos(theta + m)
