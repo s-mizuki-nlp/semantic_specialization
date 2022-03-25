@@ -20,7 +20,7 @@ def _create_mask_tensor(seq_lens: Union[np.ndarray, torch.LongTensor]):
 
     # until this step, we only created auxiliary tensors (you may already have from previous steps)
     # the real mask tensor is created with binary masking:
-    mask_tensor = (range_tensor >= seq_lens)
+    mask_tensor = (range_tensor >= seq_lens.unsqueeze(1))
 
     return mask_tensor
 
@@ -41,17 +41,18 @@ class ContrastiveLoss(L._Loss):
         # num_negative_samples[i] = [1, n_neg]; number of effective negative samples for i-th example.
 
         # vec_sim_pos: (n,)
-        vec_sim_pos = self._similarity(queries, positives)
+        # is_hard_examples: affects when similarity_module is ArcMarginProduct.
+        vec_sim_pos = self._similarity(queries, positives, is_hard_examples = True)
         # mat_sim_neg: (n, n_neg)
-        mat_sim_neg = self._similarity(queries.unsqueeze(dim=1), negatives)
+        mat_sim_neg = self._similarity(queries.unsqueeze(dim=1), negatives, is_hard_examples=False)
         # fill -inf with masked positions
         mask_tensor = _create_mask_tensor(num_negative_samples)
         mat_sim_neg = mat_sim_neg.masked_fill_(mask_tensor, value=-float("inf"))
         # mat_sim: (n, 1 + n_neg); positive pseudo logit score: mat_sim[:,0]
-        mat_sim = torch.cat([vec_sim_pos.unsqueeze(dim=-1), mat_sim_neg], dim=-11)
+        mat_sim = torch.cat([vec_sim_pos.unsqueeze(dim=-1), mat_sim_neg], dim=-1)
 
         # log likelihood of positive examples
-        # targets: (n,). targets[i] = 0
+        # targets: (n,). targets[i] = 0; ground-truth (=positive) class index is always zero.
         targets = torch.zeros_like(vec_sim_pos, dtype=torch.long)
         losses = cross_entropy(input=mat_sim, target=targets, size_average=self._size_average, reduce=self._reduce, reduction=self._reduction)
 
