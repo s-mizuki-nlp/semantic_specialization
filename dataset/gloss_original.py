@@ -13,6 +13,12 @@ import Levenshtein
 from torch.utils.data import Dataset
 from dataset_preprocessor import utils_wordnet, utils_wordnet_gloss
 
+
+# WARNING
+# 比較可能性が損なわれるため，これらのデータセットは使用すべきではない．
+# これらのデータセットはWordNetのlemma・語釈文・例文を独自の方法で平文化=コーパス化したものである．
+# 平文化の方法は既存研究=SREF[Wang and Wang, EMNLP2020]と異なっている．
+
 class WordNetGlossDataset(Dataset):
 
     def __init__(self, lst_path_gloss_corpus: Union[str, List[str]],
