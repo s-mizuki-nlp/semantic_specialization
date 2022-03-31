@@ -2,23 +2,23 @@
 # -*- coding:utf-8 -*-
 from typing import Union, List, Optional, Callable, Iterable, Dict, Any
 import copy, pickle
+from collections import defaultdict
 import warnings
 
 import os, sys, io
-import bs4.element
-from bs4 import BeautifulSoup
 from nltk import word_tokenize
 from nltk.corpus import wordnet as wn
-import Levenshtein
 
 from torch.utils.data import Dataset
 from dataset_preprocessor import utils_wordnet
+
 
 
 class WordNetGlossDataset(Dataset):
 
     def __init__(self, target_pos: List[str] = ["n","v"],
                  concat_extended_examples: bool = True,
+                 lemma_lowercase: bool = True,
                  lst_path_extended_examples_corpus: Optional[List[str]] = None,
                  filter_function: Optional[Union[Callable, List[Callable]]] = None,
                  description: str = "",
@@ -30,6 +30,7 @@ class WordNetGlossDataset(Dataset):
 
         @param target_pos: target part-of-speeches to generate gloss sentence.
         @param concat_extended_examples: whether if we concat extended examples collected by [Wang and Wang, EMNLP2020] or not. DEFAULT: True
+        @param lemma_lowercase: lowercase when look up lemmas. DEFAULT: True (= equivalent to nltk.corpus.wordnet.lemmas() behaviour)
         @param lst_path_extended_examples_corpus: list of the path to extended example corpura pickle files.
         @param filter_function: filter function(s) to be applied for annotated gloss sentence object.
         @param verbose: output verbosity.
@@ -59,10 +60,15 @@ class WordNetGlossDataset(Dataset):
         elif not isinstance(filter_function, list):
             self._filter_function = [filter_function]
 
+        self._lemma_lowercase = lemma_lowercase
+
         self._verbose = verbose
 
         # preload sentence object
         self._dataset = self._preload_dataset()
+        self._dataset_by_lemma_pos = self._reorder_dataset_using_lemma_and_pos(dataset=self._dataset)
+        self._dataset_by_lemma_sense_key = self._reorder_dataset_using_lemma_key(dataset=self._dataset)
+        self._lemma_and_pos_to_lemma_keys = self._map_lemma_and_pos_to_lemma_keys(dataset=self._dataset)
 
     def _preload_dataset(self):
         print(f"loading dataset...")
@@ -72,6 +78,33 @@ class WordNetGlossDataset(Dataset):
         print(f"loaded annotated sentences: {len(lst_sentences)}")
 
         return lst_sentences
+
+    def _reorder_dataset_using_lemma_and_pos(self, dataset):
+        dict_lemma_and_pos = defaultdict(list)
+        for record in dataset:
+            for entity in record["entities"]:
+                tup_lemma_pos = (entity["lemma"], entity["pos"])
+                dict_lemma_and_pos[tup_lemma_pos].append(record)
+
+        return dict_lemma_and_pos
+
+    def _reorder_dataset_using_lemma_key(self, dataset):
+        dict_lemma_key = defaultdict(list)
+        for record in dataset:
+            for entity in record["entities"]:
+                for lemma_key in entity["ground_truth_lemma_keys"]:
+                    dict_lemma_key[lemma_key].append(record)
+
+        return dict_lemma_key
+
+    def _map_lemma_and_pos_to_lemma_keys(self, dataset):
+        dict_lemma_and_pos = defaultdict(list)
+        for record in dataset:
+            for entity in record["entities"]:
+                tup_lemma_pos = (entity["lemma"], entity["pos"])
+                dict_lemma_and_pos[tup_lemma_pos].extend(entity["ground_truth_lemma_keys"])
+
+        return dict_lemma_and_pos
 
     def __len__(self):
         return len(self._dataset)
@@ -181,6 +214,8 @@ class WordNetGlossDataset(Dataset):
     def render_tokenized_gloss_sentence_into_annotated_sentences(self, lemma: wn.lemma,
                                                                  lemma_surface_form: str,
                                                                  tokenized_sentence: str):
+        if self._lemma_lowercase:
+            lemma_surface_form = lemma_surface_form.lower()
 
         lst_tokens = tokenized_sentence.split(" ")
         lst_lemma_surface_tokens = lemma_surface_form.split(" ")
@@ -210,3 +245,19 @@ class WordNetGlossDataset(Dataset):
             "surfaces": lst_surfaces
         }
         return dict_sentence
+
+    def get_records_by_lemma_and_pos(self, lemma: str, pos: str) -> List[Dict[str, Any]]:
+        return self._dataset_by_lemma_pos[(lemma, pos)]
+
+    def get_records_by_lemma_key(self, lemma_key: str) -> List[Dict[str, Any]]:
+        return self._dataset_by_lemma_sense_key[lemma_key]
+
+    def get_lemma_and_pos(self):
+        return set(self._dataset_by_lemma_pos.keys())
+
+    def get_lemmas(self, pos: str):
+        lst_lemmas = [_lemma for _lemma, _pos in self._dataset_by_lemma_pos.keys() if _pos == pos]
+        return set(lst_lemmas)
+
+    def get_lemma_keys_by_lemma_and_pos(self, lemma: str, pos: str):
+        return self._lemma_and_pos_to_lemma_keys[(lemma, pos)]
