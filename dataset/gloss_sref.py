@@ -1,24 +1,77 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 from typing import Union, List, Optional, Callable, Iterable, Dict, Any
+import os, sys, io
 import copy, pickle
 from collections import defaultdict
 import warnings
+from tqdm import tqdm
 
-import os, sys, io
+import numpy as np
 from nltk import word_tokenize
 from nltk.corpus import wordnet as wn
 
 from torch.utils.data import Dataset
-from dataset_preprocessor import utils_wordnet
+from dataset_preprocessor import utils_wordnet, utils_wordnet_gloss
 
+class SREFBasicLemmaEmbeddingsDataset(Dataset):
+
+    def __init__(self, path_basic_lemma_embeddings: str,
+                 l2_norm: bool, use_first_embeddings_only: bool = True,
+                 target_pos: List[str] = ["n","v","s","r"]):
+        self._path_basic_lemma_embeddings = path_basic_lemma_embeddings
+        self._target_pos = target_pos
+
+        self._dataset_by_lemma_sense_key = self.load_basic_lemma_embeddings(path=path_basic_lemma_embeddings, l2_norm=l2_norm, return_first_embeddings_only=use_first_embeddings_only)
+        # remove non-target PoS lemma sense keys.
+        self._dataset_by_lemma_sense_key = self._remove_non_target_pos_from_dataset(dataset=self._dataset_by_lemma_sense_key, target_pos=target_pos)
+
+    @classmethod
+    def load_basic_lemma_embeddings(cls, path: str, l2_norm: bool, return_first_embeddings_only: bool, force_ndim_to_2: bool = False) -> Dict[str, np.ndarray]:
+        dict_lemma_key_embeddings = {}
+
+        with io.open(path, mode="rb") as ifs:
+            dict_lst_lemma_embeddings = pickle.load(ifs)
+
+        for lemma_key, lst_lemma_key_embeddings in tqdm(dict_lst_lemma_embeddings.items()):
+            if return_first_embeddings_only:
+                # DUBIOUS: it just accounts for first embedding of each lemma keys.
+                vectors = np.array(lst_lemma_key_embeddings[0])
+            else:
+                vectors = np.array(lst_lemma_key_embeddings)
+
+            # normalize to unit length.
+            if l2_norm:
+                vectors = vectors / np.linalg.norm(vectors, axis=-1, keepdims=True)
+
+            # adjust dimension
+            if force_ndim_to_2:
+                if vectors.ndim == 1:
+                    # vectors: (1, n_dim)
+                    vectors = vectors.reshape(1,-1)
+
+            dict_lemma_key_embeddings[lemma_key] = vectors
+
+        return dict_lemma_key_embeddings
+
+    def _remove_non_target_pos_from_dataset(self, dataset: Dict[str, Any], target_pos: Iterable[str]):
+
+        lst_lemma_keys_to_be_removed = [lemma_key for lemma_key in dataset.keys() if utils_wordnet_gloss.lemma_key_to_pos(lemma_key) in target_pos]
+        for lemma_key in lst_lemma_keys_to_be_removed:
+            del dataset[lemma_key]
+
+        return dataset
+
+    def get_records_by_lemma_key(self, lemma_key: str) -> List[Dict[str, Any]]:
+        return self._dataset_by_lemma_sense_key[lemma_key]
 
 
 class WordNetGlossDataset(Dataset):
 
-    def __init__(self, target_pos: List[str] = ["n","v"],
+    def __init__(self, target_pos: List[str] = ["n","v","s","r"],
                  concat_extended_examples: bool = True,
                  lemma_lowercase: bool = True,
+                 convert_adjective_to_adjective_satellite: bool = True,
                  lst_path_extended_examples_corpus: Optional[List[str]] = None,
                  filter_function: Optional[Union[Callable, List[Callable]]] = None,
                  description: str = "",
@@ -50,6 +103,7 @@ class WordNetGlossDataset(Dataset):
         self._target_pos = target_pos
         self._lst_path_extended_examples_corpus = lst_path_extended_examples_corpus
         self._concat_extended_examples = concat_extended_examples
+        self._convert_adjective_to_adjective_satellite = convert_adjective_to_adjective_satellite
 
         self._description = description
 
@@ -149,7 +203,6 @@ class WordNetGlossDataset(Dataset):
 
         for synset in self._synset_loader():
             lst_lemmas = synset.lemmas()
-            pos = synset.pos()
             synset_id = synset.name()
 
             # lst_lemma_surfaces = list of lemma surface forms of the synset
@@ -219,11 +272,15 @@ class WordNetGlossDataset(Dataset):
 
         lst_tokens = tokenized_sentence.split(" ")
         lst_lemma_surface_tokens = lemma_surface_form.split(" ")
+        pos = lemma.synset().pos()
+        if self._convert_adjective_to_adjective_satellite:
+            pos = "s" if pos == "a" else pos
+
         entity = {
             "lemma": lemma_surface_form,
             "ground_truth_lemma_keys": [lemma.key()],
             "ground_truth_synset_ids": [lemma.synset().name()],
-            "pos": lemma.synset().pos(),
+            "pos": pos,
             "span": [0, len(lst_lemma_surface_tokens)]
         }
         lst_surfaces = []
