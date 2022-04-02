@@ -80,6 +80,17 @@ def lemma_key_to_synset_id(lemma_key: str):
                 return synset.name()
         raise ValueError(f"No synset found for key {lemma_key}")
 
+def lemma_key_to_lemma(lemma_key: str):
+    try:
+        return wn.lemma_from_key(lemma_key)
+    except:
+        lemma_name = lemma_key_to_lemma_name(lemma_key)
+        pos = lemma_key_to_pos(lemma_key, tagtype="short")
+        for lemma in wn.lemmas(lemma_name, pos):
+            if lemma.key() == lemma_key:
+                return lemma
+        raise ValueError(f"No lemma found for key {lemma_key}")
+
 # instance-of lemmaを判定する関数
 def is_instance_of_lemma(str_lemma: str, pos: str):
     lst_lemmas = wn.lemmas(str_lemma, pos)
@@ -90,7 +101,6 @@ def is_instance_of_lemma(str_lemma: str, pos: str):
         return True
     else:
         return False
-
 
 def extract_synset_taxonomy(target_part_of_speech: List[str] = ["n", "v"], valid_synset_ids: Set[str] = None,
                             include_instance_of_lemmas: bool = True):
