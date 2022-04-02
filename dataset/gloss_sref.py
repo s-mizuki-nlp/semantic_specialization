@@ -16,15 +16,35 @@ from dataset_preprocessor import utils_wordnet, utils_wordnet_gloss
 
 class SREFBasicLemmaEmbeddingsDataset(Dataset):
 
-    def __init__(self, path_basic_lemma_embeddings: str,
-                 l2_norm: bool, use_first_embeddings_only: bool = True,
+    def __init__(self, path: str,
+                 l2_norm: bool,
+                 use_first_embeddings_only: bool = True,
+                 lemma_surface_form_lowercase: bool = False,
                  target_pos: List[str] = ["n","v","s","r"]):
-        self._path_basic_lemma_embeddings = path_basic_lemma_embeddings
+        self._path_basic_lemma_embeddings = path
         self._target_pos = target_pos
+        self._lemma_surface_form_lowercase = lemma_surface_form_lowercase
 
-        self._dataset_by_lemma_sense_key = self.load_basic_lemma_embeddings(path=path_basic_lemma_embeddings, l2_norm=l2_norm, return_first_embeddings_only=use_first_embeddings_only)
-        # remove non-target PoS lemma sense keys.
-        self._dataset_by_lemma_sense_key = self._remove_non_target_pos_from_dataset(dataset=self._dataset_by_lemma_sense_key, target_pos=target_pos)
+        force_ndim_to_2 = False if use_first_embeddings_only else True
+        dict_basic_lemma_embeddings = self.load_basic_lemma_embeddings(path=path, l2_norm=l2_norm, return_first_embeddings_only=use_first_embeddings_only,
+                                                                            force_ndim_to_2=force_ndim_to_2)
+        # reformat list of records. each record contains single lemma sense key and its embeddings.
+        self._dataset = self._annotate_records(dict_basic_lemma_embeddings)
+        self._index_by_lemma_and_pos = self._reindex_dataset_using_lemma_and_pos(dataset=self._dataset)
+        self._index_by_lemma_key = self._reindex_dataset_using_lemma_key(dataset=self._dataset)
+        self._lemma_and_pos_to_lemma_keys = self._map_lemma_and_pos_to_lemma_keys(dataset=self._dataset)
+
+    def __len__(self):
+        return len(self._dataset)
+
+    def __iter__(self):
+        for idx in range(len(self)):
+            record = self.__getitem__(idx)
+            yield record
+
+    def __getitem__(self, item):
+        record = self._dataset[item]
+        return record
 
     @classmethod
     def load_basic_lemma_embeddings(cls, path: str, l2_norm: bool, return_first_embeddings_only: bool, force_ndim_to_2: bool = False) -> Dict[str, np.ndarray]:
@@ -54,23 +74,81 @@ class SREFBasicLemmaEmbeddingsDataset(Dataset):
 
         return dict_lemma_key_embeddings
 
-    def _remove_non_target_pos_from_dataset(self, dataset: Dict[str, Any], target_pos: Iterable[str]):
+    def _annotate_records(self, dict_basic_lemma_embeddings: Dict[str, np.ndarray]) -> List[Dict[str, Any]]:
+        lst_records = []
+        for lemma_key, embeddings in dict_basic_lemma_embeddings.items():
+            lemma = utils_wordnet_gloss.lemma_key_to_lemma(lemma_key)
+            pos = utils_wordnet_gloss.lemma_key_to_pos(lemma_key, tagtype="short") # it returns one of ["n","v","s","r"]
+            if pos not in self._target_pos:
+                continue
 
-        lst_lemma_keys_to_be_removed = [lemma_key for lemma_key in dataset.keys() if utils_wordnet_gloss.lemma_key_to_pos(lemma_key) in target_pos]
-        for lemma_key in lst_lemma_keys_to_be_removed:
-            del dataset[lemma_key]
+            lemma_name = utils_wordnet_gloss.lemma_key_to_lemma_name(lemma_key)
+            lemma_surface_form = utils_wordnet.lemma_to_surface_form(lemma)
+            synset_id = utils_wordnet_gloss.lemma_key_to_synset_id(lemma_key)
+            if self._lemma_surface_form_lowercase:
+                lemma_surface_form = lemma_surface_form.lower()
+            record = {
+                "lemma": lemma_name,
+                "lemma_surface_form": lemma_surface_form,
+                "pos": pos,
+                "ground_truth_lemma_keys": [lemma_key],
+                "ground_truth_synset_ids": [synset_id],
+                "embeddings": embeddings
+            }
+            lst_records.append(record)
+        return lst_records
 
-        return dataset
+    def _reindex_dataset_using_lemma_and_pos(self, dataset):
+        dict_lemma_and_pos_index = defaultdict(list)
+        for idx, record in enumerate(dataset):
+            tup_lemma_pos = (record["lemma"], record["pos"])
+            dict_lemma_and_pos_index[tup_lemma_pos].append(idx)
+
+        return dict_lemma_and_pos_index
+
+    def _reindex_dataset_using_lemma_key(self, dataset):
+        dict_lemma_key_index = defaultdict(list)
+        for idx, record in enumerate(dataset):
+            for lemma_key in record["ground_truth_lemma_keys"]:
+                dict_lemma_key_index[lemma_key].append(idx)
+
+        return dict_lemma_key_index
+
+    def _map_lemma_and_pos_to_lemma_keys(self, dataset):
+        dict_lemma_and_pos_to_lemma_keys_index = defaultdict(list)
+        for record in dataset:
+            tup_lemma_pos = (record["lemma"], record["pos"])
+            dict_lemma_and_pos_to_lemma_keys_index[tup_lemma_pos].extend(record["ground_truth_lemma_keys"])
+
+        return dict_lemma_and_pos_to_lemma_keys_index
 
     def get_records_by_lemma_key(self, lemma_key: str) -> List[Dict[str, Any]]:
-        return self._dataset_by_lemma_sense_key[lemma_key]
+        lst_records = []
+        for idx in self._index_by_lemma_key[lemma_key]:
+            lst_records.append(self.__getitem__(idx))
+        return lst_records
 
+    def get_records_by_lemma_and_pos(self, lemma: str, pos: str) -> List[Dict[str, Any]]:
+        lst_records = []
+        for idx in self._index_by_lemma_and_pos[(lemma, pos)]:
+            lst_records.append(self.__getitem__(idx))
+        return lst_records
+
+    def get_lemma_and_pos(self):
+        return list(set(self._index_by_lemma_and_pos.keys()))
+
+    def get_lemmas(self, pos: str):
+        lst_lemmas = [_lemma for _lemma, _pos in self._index_by_lemma_and_pos.keys() if _pos == pos]
+        return list(set(lst_lemmas))
+
+    def get_lemma_keys_by_lemma_and_pos(self, lemma: str, pos: str):
+        return self._lemma_and_pos_to_lemma_keys[(lemma, pos)]
 
 class WordNetGlossDataset(Dataset):
 
     def __init__(self, target_pos: List[str] = ["n","v","s","r"],
                  concat_extended_examples: bool = True,
-                 lemma_lowercase: bool = True,
+                 lemma_surface_form_lowercase: bool = False,
                  convert_adjective_to_adjective_satellite: bool = True,
                  lst_path_extended_examples_corpus: Optional[List[str]] = None,
                  filter_function: Optional[Union[Callable, List[Callable]]] = None,
@@ -83,7 +161,7 @@ class WordNetGlossDataset(Dataset):
 
         @param target_pos: target part-of-speeches to generate gloss sentence.
         @param concat_extended_examples: whether if we concat extended examples collected by [Wang and Wang, EMNLP2020] or not. DEFAULT: True
-        @param lemma_lowercase: lowercase when look up lemmas. DEFAULT: True (= equivalent to nltk.corpus.wordnet.lemmas() behaviour)
+        @param lemma_surface_form_lowercase: lowercase lemma surface forms (e.g., cat%1:04:00:: -> CAT). DEFAULT: True (= equivalent to nltk.corpus.wordnet.lemmas() behaviour)
         @param lst_path_extended_examples_corpus: list of the path to extended example corpura pickle files.
         @param filter_function: filter function(s) to be applied for annotated gloss sentence object.
         @param verbose: output verbosity.
@@ -114,7 +192,7 @@ class WordNetGlossDataset(Dataset):
         elif not isinstance(filter_function, list):
             self._filter_function = [filter_function]
 
-        self._lemma_lowercase = lemma_lowercase
+        self._lemma_surface_form_lowercase = lemma_surface_form_lowercase
 
         self._verbose = verbose
 
@@ -267,7 +345,7 @@ class WordNetGlossDataset(Dataset):
     def render_tokenized_gloss_sentence_into_annotated_sentences(self, lemma: wn.lemma,
                                                                  lemma_surface_form: str,
                                                                  tokenized_sentence: str):
-        if self._lemma_lowercase:
+        if self._lemma_surface_form_lowercase:
             lemma_surface_form = lemma_surface_form.lower()
 
         lst_tokens = tokenized_sentence.split(" ")
@@ -277,7 +355,8 @@ class WordNetGlossDataset(Dataset):
             pos = "s" if pos == "a" else pos
 
         entity = {
-            "lemma": lemma_surface_form,
+            "lemma": utils_wordnet_gloss.lemma_key_to_lemma_name(lemma.key()),
+            "lemma_surface_form": lemma_surface_form,
             "ground_truth_lemma_keys": [lemma.key()],
             "ground_truth_synset_ids": [lemma.synset().name()],
             "pos": pos,
@@ -310,11 +389,11 @@ class WordNetGlossDataset(Dataset):
         return self._dataset_by_lemma_sense_key[lemma_key]
 
     def get_lemma_and_pos(self):
-        return set(self._dataset_by_lemma_pos.keys())
+        return list(set(self._dataset_by_lemma_pos.keys()))
 
     def get_lemmas(self, pos: str):
         lst_lemmas = [_lemma for _lemma, _pos in self._dataset_by_lemma_pos.keys() if _pos == pos]
-        return set(lst_lemmas)
+        return list(set(lst_lemmas))
 
     def get_lemma_keys_by_lemma_and_pos(self, lemma: str, pos: str):
         return self._lemma_and_pos_to_lemma_keys[(lemma, pos)]
