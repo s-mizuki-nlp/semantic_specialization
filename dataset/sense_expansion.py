@@ -6,14 +6,20 @@ from nltk.corpus import wordnet as wn
 
 def extract_lemma_keys_and_weights_from_semantically_related_synsets(synset_id: str,
                                                                      semantic_relation: str,
-                                                                     distinct: bool = False) -> Tuple[List[str], List[int]]:
+                                                                     distinct: bool = False,
+                                                                     fix_synonym_distance: bool = True) -> Tuple[List[str], List[int]]:
     lst_lemma_keys = []; lst_weights = []
     lst_related_synsets = gloss_extend(o_sense=synset_id, emb_strategy=semantic_relation)
     synset_src = wn.synset(synset_id)
     for synset_rel in lst_related_synsets:
         distance = synset_src.shortest_path_distance(synset_rel)
-        # if distance is unknown, five will be used.
-        distance = distance if distance else 5
+
+        if fix_synonym_distance:
+            # fixed implementation. it treats disconnected sense as farthest one.
+            distance = 5 if distance is None else distance
+        else:
+            # original implementation. it wrongly evaluates synonym (=zero distance) as farthest sense.
+            distance = distance if distance else 5
         weight = 1 / (1 + distance)
         for lemma in synset_rel.lemmas():
             if distinct and (lemma.key() in lst_lemma_keys):
