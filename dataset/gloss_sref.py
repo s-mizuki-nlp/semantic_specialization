@@ -20,10 +20,12 @@ class SREFBasicLemmaEmbeddingsDataset(Dataset):
                  l2_norm: bool,
                  use_first_embeddings_only: bool = True,
                  lemma_surface_form_lowercase: bool = False,
-                 target_pos: List[str] = ["n","v","s","r"]):
+                 target_pos: List[str] = ["n","v","s","r"],
+                 description: str = ""):
         self._path_basic_lemma_embeddings = path
         self._target_pos = target_pos
         self._lemma_surface_form_lowercase = lemma_surface_form_lowercase
+        self._description = description
 
         force_ndim_to_2 = False if use_first_embeddings_only else True
         dict_basic_lemma_embeddings = self.load_basic_lemma_embeddings(path=path, l2_norm=l2_norm, return_first_embeddings_only=use_first_embeddings_only,
@@ -33,6 +35,7 @@ class SREFBasicLemmaEmbeddingsDataset(Dataset):
         self._index_by_lemma_and_pos = self._reindex_dataset_using_lemma_and_pos(dataset=self._dataset)
         self._index_by_lemma_key = self._reindex_dataset_using_lemma_key(dataset=self._dataset)
         self._lemma_and_pos_to_lemma_keys = self._map_lemma_and_pos_to_lemma_keys(dataset=self._dataset)
+
 
     def __len__(self):
         return len(self._dataset)
@@ -147,6 +150,18 @@ class SREFBasicLemmaEmbeddingsDataset(Dataset):
     def get_lemma_keys(self):
         return list(self._index_by_lemma_key.keys())
 
+    @property
+    def verbose(self):
+        ret = {
+            "target_pos": self._target_pos,
+            "lemma_surface_form_lowercase": self._lemma_surface_form_lowercase,
+            "path": self._path_basic_lemma_embeddings,
+            "__len__": self.__len__(),
+            "num_lemma_and_pos": len(self.get_lemma_and_pos()),
+            "num_lemma_keys": len(self.get_lemma_keys()),
+            "description":self._description
+        }
+        return ret
 
 class WordNetGlossDataset(Dataset):
 
@@ -197,7 +212,7 @@ class WordNetGlossDataset(Dataset):
             self._filter_function = [filter_function]
 
         self._lemma_surface_form_lowercase = lemma_surface_form_lowercase
-
+        self._description = description
         self._verbose = verbose
 
         # preload sentence object
@@ -404,3 +419,18 @@ class WordNetGlossDataset(Dataset):
 
     def get_lemma_keys(self):
         return list(self._dataset_by_lemma_sense_key.keys())
+
+    @property
+    def verbose(self):
+        ret = {
+            "target_pos": self._target_pos,
+            "concat_extended_examples": self._concat_extended_examples,
+            "lemma_surface_form_lowercase": self._lemma_surface_form_lowercase,
+            "convert_adjective_to_adjective_satellite":self._convert_adjective_to_adjective_satellite,
+            "lst_path_extended_examples_corpus": self._lst_path_extended_examples_corpus,
+            "__len__": self.__len__(),
+            "num_lemma_and_pos": len(self.get_lemma_and_pos()),
+            "num_lemma_keys": len(self.get_lemma_keys()),
+            "description":self._description
+        }
+        return ret
