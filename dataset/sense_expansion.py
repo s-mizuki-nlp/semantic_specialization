@@ -24,10 +24,14 @@ def extract_lemma_keys_and_weights_from_semantically_related_synsets(synset_id: 
             distance = distance if distance else 5
         weight = 1 / (1 + distance)
         for lemma in synset_rel.lemmas():
+            lemma_key = lemma.key()
             if distinct and (lemma.key() in lst_lemma_keys):
+                idx = lst_lemma_keys.index(lemma_key)
+                lst_weights[idx] += weight
                 continue
-            lst_lemma_keys.append(lemma.key())
-            lst_weights.append(weight)
+            else:
+                lst_lemma_keys.append(lemma.key())
+                lst_weights.append(weight)
 
     return lst_lemma_keys, lst_weights
 
