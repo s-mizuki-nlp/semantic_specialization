@@ -2,8 +2,10 @@
 # -*- coding:utf-8 -*-
 
 from typing import List, Dict, Tuple
+from functools import lru_cache
 from nltk.corpus import wordnet as wn
 
+@lru_cache(maxsize=int(1E6))
 def extract_lemma_keys_and_weights_from_semantically_related_synsets(synset_id: str,
                                                                      semantic_relation: str,
                                                                      distinct: bool = False,
@@ -79,13 +81,11 @@ def get_related(names, relation='hypernyms'):
     return related_list
 
 
-def morpho_extend(extended_list):
-    morpho_list = list()
-    for synset in extended_list:
-        morpho_list += [j.synset() for j in
-                        list(sum([i.derivationally_related_forms() for i in synset.lemmas()], []))]
-    return morpho_list
-
+def morpho_extend(synset):
+    lst_morpho_synsets = list()
+    lst_synonymy_lemmas = list(sum([lemma.derivationally_related_forms() for lemma in synset.lemmas()], []))
+    lst_morpho_synsets += [lemma.synset() for lemma in lst_synonymy_lemmas]
+    return lst_morpho_synsets
 
 def gloss_extend(o_sense, emb_strategy) -> List[wn.synset]:
     """
@@ -96,13 +96,17 @@ def gloss_extend(o_sense, emb_strategy) -> List[wn.synset]:
     :return: extended_list_gloss: the bag-of-synset
     """
     extended_list, combine_list = list(), [wn.synset(o_sense)]
-    if emb_strategy in ("all-relations", "all-relations-but-hyponymy"):
+    if emb_strategy in ("all-relations", "all-relations-but-hyponymy", "all-relations-but-synonymy"):
         relation_list = ['hyponyms', 'part_holonyms', 'part_meronyms', 'member_holonyms', 'antonyms',
                      'member_meronyms', 'entailments', 'attributes', 'similar_tos', 'causes', 'pertainyms',
                      'substance_holonyms', 'substance_meronyms', 'usage_domains', 'also_sees']
-        extended_list += morpho_extend([wn.synset(o_sense)])
+
         if emb_strategy == "all-relations-but-hyponymy":
             relation_list.remove("hyponyms")
+
+        if emb_strategy != "all-relations-but-synonymy":
+            extended_list += morpho_extend(wn.synset(o_sense))
+
     elif emb_strategy == "hyponymy":
         relation_list = ['hyponyms']
     else:
