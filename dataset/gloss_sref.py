@@ -144,6 +144,10 @@ class SREFBasicLemmaEmbeddingsDataset(Dataset):
     def get_lemma_keys_by_lemma_and_pos(self, lemma: str, pos: str):
         return self._lemma_and_pos_to_lemma_keys[(lemma, pos)]
 
+    def get_lemma_keys(self):
+        return list(self._index_by_lemma_key.keys())
+
+
 class WordNetGlossDataset(Dataset):
 
     def __init__(self, target_pos: List[str] = ["n","v","s","r"],
@@ -397,3 +401,6 @@ class WordNetGlossDataset(Dataset):
 
     def get_lemma_keys_by_lemma_and_pos(self, lemma: str, pos: str):
         return self._lemma_and_pos_to_lemma_keys[(lemma, pos)]
+
+    def get_lemma_keys(self):
+        return list(self._dataset_by_lemma_sense_key.keys())
