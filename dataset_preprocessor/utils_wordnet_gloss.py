@@ -3,6 +3,7 @@
 
 from typing import List, Set
 from anytree import AnyNode
+from functools import lru_cache
 
 import nltk
 try:
@@ -69,6 +70,7 @@ def synset_to_lemma_key_and_names(synset: wn.synset, include_instance_of_lemmas:
 
     return dict_ret
 
+@lru_cache(maxsize=int(1E6))
 def lemma_key_to_synset_id(lemma_key: str):
     try:
         return wn.lemma_from_key(lemma_key).synset().name()
