@@ -56,12 +56,24 @@ class SREFBasicLemmaEmbeddingsDataset(Dataset):
         with io.open(path, mode="rb") as ifs:
             dict_lst_lemma_embeddings = pickle.load(ifs)
 
-        for lemma_key, lst_lemma_key_embeddings in tqdm(dict_lst_lemma_embeddings.items()):
+        for lemma_key, lst_or_numpy_lemma_key_embeddings in tqdm(dict_lst_lemma_embeddings.items()):
             if return_first_embeddings_only:
                 # DUBIOUS: it just accounts for first embedding of each lemma keys.
-                vectors = np.array(lst_lemma_key_embeddings[0])
+                if isinstance(lst_or_numpy_lemma_key_embeddings, list):
+                    if isinstance(lst_or_numpy_lemma_key_embeddings[0], list):
+                        vectors = np.array(lst_or_numpy_lemma_key_embeddings[0])
+                    else:
+                        vectors = np.array(lst_or_numpy_lemma_key_embeddings)
+                elif isinstance(lst_or_numpy_lemma_key_embeddings, np.ndarray):
+                    if lst_or_numpy_lemma_key_embeddings.ndim == 1:
+                        vectors = lst_or_numpy_lemma_key_embeddings
+                    elif lst_or_numpy_lemma_key_embeddings.ndim == 2:
+                        vectors = lst_or_numpy_lemma_key_embeddings[0,:]
             else:
-                vectors = np.array(lst_lemma_key_embeddings)
+                if isinstance(lst_or_numpy_lemma_key_embeddings, list):
+                    vectors = np.array(lst_or_numpy_lemma_key_embeddings)
+                elif isinstance(lst_or_numpy_lemma_key_embeddings, np.ndarray):
+                    vectors = lst_or_numpy_lemma_key_embeddings
 
             # normalize to unit length.
             if l2_norm:
