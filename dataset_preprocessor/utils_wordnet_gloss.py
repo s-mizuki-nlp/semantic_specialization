@@ -93,6 +93,10 @@ def lemma_key_to_lemma(lemma_key: str):
                 return lemma
         raise ValueError(f"No lemma found for key {lemma_key}")
 
+def lemma_key_to_lexname(lemma_key: str):
+    lemma = lemma_key_to_lemma(lemma_key)
+    return lemma.synset().lexname()
+
 # instance-of lemmaを判定する関数
 def is_instance_of_lemma(str_lemma: str, pos: str):
     lst_lemmas = wn.lemmas(str_lemma, pos)
