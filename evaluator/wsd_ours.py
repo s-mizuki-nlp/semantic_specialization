@@ -6,7 +6,7 @@ import torch
 from torch.nn import functional as F
 from nltk.corpus import wordnet as wn
 
-from model.core import HierarchicalCodeEncoder
+# from model.core import HierarchicalCodeEncoder
 from model.loss_supervised import HyponymyScoreLoss
 
 from .wsd_baseline import MostFrequentSenseWSDTaskEvaluator, WSDTaskEvaluatorBase, numeric
