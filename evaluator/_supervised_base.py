@@ -15,12 +15,10 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from nltk.corpus import wordnet as wn
 
-from model.loss_supervised import HyponymyScoreLoss
-
 from config_files.wsd_task import WSDTaskDataLoader
 from dataset import WSDTaskDataset
 from dataset.lexical_knowledge import SynsetDataset
-from dataset.utils import tensor_to_device, str_to_list
+
 
 class BaseEvaluator(object):
 
@@ -256,37 +254,3 @@ class WSDTaskEvaluatorBase(BaseEvaluatorByRaganato, metaclass=ABCMeta):
         dict_summary = self.macro_average_recursive(dict_dict_results)
 
         return dict_summary
-
-
-class WiCTaskEvaluatorBase(BaseEvaluator):
-    """
-    Evaluator for Word-in-Context task [Pilehvar and Camacho-Collados, NAACL2019]. This will be used for analysis.
-    """
-
-
-class SenseCodingTaskEvaluatorBase(BaseEvaluator):
-
-    """
-    Evaluator for synset code prediction task. This will be used for future work.
-    """
-
-    def __init__(self, lexical_knowledge_synset_dataset: SynsetDataset):
-        self._aux_hyponymy_score = HyponymyScoreLoss()
-
-    def _soft_lowest_common_ancestor_length_ratio(self, t_target_codes: torch.Tensor, t_code_probs_pred: torch.Tensor):
-        # one-hot encoding without smoothing
-        n_ary = t_code_probs_pred.shape[-1]
-        t_code_probs_gt = self._aux_hyponymy_score._one_hot_encoding(t_codes=t_target_codes, n_ary=n_ary, label_smoothing_factor=0.0)
-
-        # code lengths
-        t_code_length_gt = (t_target_codes != 0).sum(axis=-1).type(torch.float)
-
-        # common prefix lengths
-        t_soft_cpl = self._aux_hyponymy_score.calc_soft_lowest_common_ancestor_length(t_prob_c_x=t_code_probs_gt, t_prob_c_y=t_code_probs_pred)
-        t_lca_vs_gt_ratio = t_soft_cpl / t_code_length_gt
-
-        return t_lca_vs_gt_ratio
-
-    def compute_metrics(self, t_target_codes: torch.Tensor, t_code_probs_pred: torch.Tensor):
-        # ToDo: implement it later
-        pass
