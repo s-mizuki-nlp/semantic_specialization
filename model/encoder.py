@@ -48,3 +48,29 @@ class MultiLayerPerceptron(nn.Module):
                 h = self._activation(dense(h))
 
         return h
+
+    def predict(self, x):
+        with torch.no_grad():
+            return self.forward(x)
+
+class Identity(nn.Module):
+
+    def __init__(self, **kwargs):
+        """
+        multi-layer dense neural network with artibrary activation function
+        output = Dense(iter(Activation(Dense())))(input)
+
+        :param n_dim_in: input dimension size
+        :param n_dim_out: output dimension size
+        :param n_dim_hidden: hidden layer dimension size
+        :param n_layer: number of layers
+        :param activation_function: activation function. e.g. torch.relu
+        """
+        super().__init__()
+
+    def forward(self, x):
+        return x
+
+    def predict(self, x):
+        with torch.no_grad():
+            return self.forward(x)
