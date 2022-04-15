@@ -13,31 +13,25 @@ from torch.nn import functional as F
 from torch.utils.data import IterableDataset
 from .encoder import extract_entity_subword_embeddings, calc_entity_subwords_average_vectors
 from . import utils
+from dataset_preprocessor import utils_wordnet, utils_wordnet_gloss
 
 class WSDTaskDataset(IterableDataset):
 
-    def __init__(self, is_trainset: bool,
+    def __init__(self, has_ground_truth: bool,
                  bert_embeddings_dataset: BERTEmbeddingsDataset,
-                 lexical_knowledge_lemma_dataset: Optional[LemmaDataset] = None,
-                 lexical_knowledge_synset_dataset: Optional[SynsetDataset] = None,
-                 n_ancestor_hop_of_ground_truth_synset: int = 0,
                  return_level: str = "entity",
-                 record_entity_field_name: str = "monosemous_entities",
+                 record_entity_field_name: str = "entities",
                  record_entity_span_field_name: str = "subword_spans",
                  ground_truth_lemma_keys_field_name: Optional[str] = None,
                  copy_field_names_from_record_to_entity: Optional[Iterable[str]] = None,
-                 return_entity_subwords_avg_vector: bool = False,
+                 return_entity_subwords_avg_vector: bool = True,
                  weighted_average_entity_embeddings_and_sentence_embedding: float = 0.0,
                  normalize_embeddings: bool = False,
-                 raise_error_on_unknown_lemma: bool = True,
                  excludes: Optional[Set[str]] = None):
 
-        self._is_trainset = is_trainset
+        self._has_ground_truth = has_ground_truth
         self._bert_embeddings = bert_embeddings_dataset
-        self._lexical_knowledge_lemma = lexical_knowledge_lemma_dataset
-        self._lexical_knowledge_synset = lexical_knowledge_synset_dataset
         self._return_level = return_level
-        self._raise_error_on_unknown_lemma = raise_error_on_unknown_lemma
         self._record_entity_field_name = record_entity_field_name
         self._record_entity_span_field_name = record_entity_span_field_name
         self._ground_truth_lemma_keys_field_name = ground_truth_lemma_keys_field_name
@@ -47,31 +41,12 @@ class WSDTaskDataset(IterableDataset):
         self._weighted_average_entity_embeddings_and_sentence_embedding = weighted_average_entity_embeddings_and_sentence_embedding
         self._excludes = set() if excludes is None else excludes
 
-        if is_trainset:
-            assert lexical_knowledge_lemma_dataset is not None, f"you have to specify `lexical_knowledge_lemma_dataset` to get ground-truth synset code."
-
-        assert n_ancestor_hop_of_ground_truth_synset >= 0, f"`n_ancestor_hop_of_ground_truth_synset` must be zero or positive: {n_ancestor_hop_of_ground_truth_synset}"
-        self._n_ancestor_hop_of_ground_truth_synset = n_ancestor_hop_of_ground_truth_synset
-        if self._n_ancestor_hop_of_ground_truth_synset > 0:
-            assert lexical_knowledge_synset_dataset, f"you have to specify `lexical_knowledge_synset_dataset` to get ancestor synset code."
-
     @classmethod
     def extract_entity_spans_from_record(cls, record: Dict[str, Any],
                                          entity_field_name: str,
                                          span_field_name: str):
         lst_entity_spans = [entity[span_field_name] for entity in record[entity_field_name]]
         return lst_entity_spans
-
-    def _test_if_unknown_lemma(self, lemma: str, pos: str) -> bool:
-        if self.lemma_dataset is None:
-            return False
-        if (lemma, pos) not in self.lemma_dataset:
-            msg = f"unknown lemma detected: ({lemma},{pos})"
-            if self._raise_error_on_unknown_lemma:
-                raise ValueError(msg)
-            else:
-                warnings.warn(msg)
-                return True
 
     def _copy_fields(self, dict_source: Dict[str, Any], dict_target: Dict[str, Any],
                      copy_field_names: Optional[Iterable[str]] = None):
@@ -103,8 +78,6 @@ class WSDTaskDataset(IterableDataset):
                                             copy_field_names=self._copy_field_names_from_record_to_entity)
 
             lemma, pos = dict_entity["lemma"], dict_entity["pos"]
-            if self._test_if_unknown_lemma(lemma, pos):
-                continue
 
             obj_entity = {
                 "lemma":lemma,
@@ -123,37 +96,13 @@ class WSDTaskDataset(IterableDataset):
                 obj_entity.update(embeddings)
 
             # assign ground-truth synset
-            if self._is_trainset: # training dataset
-                if self._ground_truth_lemma_keys_field_name is not None:
-                    lemma_keys = dict_entity[self._ground_truth_lemma_keys_field_name]
-                    synset_ids = self.lemma_dataset.get_synset_ids_from_lemma_keys(lemma_keys)
-                    synset_codes = list(map(self.synset_dataset.get_synset_code, synset_ids))
-                    lexnames = self.lemma_dataset.get_lexnames_from_lemma_keys(lemma_keys)
-                else:
-                    synset_ids = self.lemma_dataset.get_synset_ids(lemma, pos)
-                    synset_codes = self.lemma_dataset.get_synset_codes(lemma, pos)
-                    lexnames = self.lemma_dataset[(lemma, pos)]["lexnames"]
+            if self._has_ground_truth: # training dataset
+                lemma_keys = dict_entity[self._ground_truth_lemma_keys_field_name]
+                synset_ids = list(map(utils_wordnet_gloss.lemma_key_to_synset_id, lemma_keys))
+                lexnames = list(map(utils_wordnet_gloss.lemma_key_to_lexname, lemma_keys))
 
-                    assert (len(synset_ids) == 1) and (len(synset_codes) == 1), \
-                        f"specified entity is sense-ambiguous: {','.join(synset_ids)}"
-
-                # (optional) assign ancestor synset as the ground-truth.
-                if self._n_ancestor_hop_of_ground_truth_synset == 0:
-                    obj_entity["ground_truth_synset_id"] = synset_ids[0]
-                    obj_entity["ground_truth_synset_code"] = synset_codes[0]
-                    obj_entity["ground_truth_synset_code_prefix"] = self.synset_dataset.synset_code_to_prefix_ids(synset_code=synset_codes[0], pos=pos, trim=True, pad=True)
-                    obj_entity["ground_truth_lexname"] = lexnames[0]
-                else:
-                    lst_ancestor_synsets = self.synset_dataset.get_ancestor_synsets(synset_ids[0])
-                    if len(lst_ancestor_synsets) == 0:
-                        warnings.warn(f"failed to lookup ancestor synset: {synset_ids[0]}")
-                        continue
-                    idx = min(self._n_ancestor_hop_of_ground_truth_synset, len(lst_ancestor_synsets)) - 1
-                    ancestor_synset = lst_ancestor_synsets[idx]
-                    obj_entity["ground_truth_synset_id"] = ancestor_synset["id"]
-                    obj_entity["ground_truth_synset_code"] = ancestor_synset["code"]
-                    obj_entity["ground_truth_synset_code_prefix"] = self.synset_dataset.synset_code_to_prefix_ids(synset_code=ancestor_synset["code"], pos=pos, trim=True, pad=True)
-                    obj_entity["ground_truth_lexname"] = ancestor_synset["lexname"]
+                obj_entity["ground_truth_synset_id"] = synset_ids[0]
+                obj_entity["ground_truth_lexname"] = lexnames[0]
 
             else: # evaluation dataset -> dataset.evalution.WSDEvaluationDataset
                 pass
@@ -251,24 +200,12 @@ class WSDTaskDataset(IterableDataset):
         return n_records
 
     @property
-    def lemma_dataset(self):
-        return self._lexical_knowledge_lemma
-
-    @property
-    def synset_dataset(self):
-        return self._lexical_knowledge_synset
-
-    @property
     def embeddings_dataset(self):
         return self._bert_embeddings
 
     @property
-    def n_ancestor_hop_of_ground_truth_synset(self):
-        return self._n_ancestor_hop_of_ground_truth_synset
-
-    @property
-    def is_trainset(self):
-        return self._is_trainset
+    def has_ground_truth(self):
+        return self._has_ground_truth
 
     def record_loader(self):
         self._bert_embeddings.return_record_only = True
@@ -283,13 +220,13 @@ class WSDTaskDataset(IterableDataset):
 class WSDTaskDatasetCollateFunction(object):
 
     def __init__(self,
-                 is_trainset: bool,
+                 has_ground_truth: bool,
                  return_records: bool = True,
                  return_entity_context_attn_mask: bool = False,
                  num_heads_entity_context_mha: Optional[int] = None,
                  device: Optional[str] = "cpu"):
 
-        self._is_trainset = is_trainset
+        self._has_ground_truth = has_ground_truth
         self._return_records = return_records
         self._return_entity_context_attn_mask = return_entity_context_attn_mask
 
@@ -343,10 +280,8 @@ class WSDTaskDatasetCollateFunction(object):
             )
             dict_ret["entity_context_attn_mask"] = entity_context_attn_mask
 
-        if self._is_trainset:
+        if self._has_ground_truth:
             # ground truth: synset code
-            dict_ret["ground_truth_synset_codes"] = torch.tensor(_list_of("ground_truth_synset_code"), dtype=torch.long).to(self._device)
-            dict_ret["ground_truth_synset_code_prefixes"] = torch.tensor(_list_of("ground_truth_synset_code_prefix"), dtype=torch.long).to(self._device)
             dict_ret["ground_truth_synset_ids"] = _list_of("ground_truth_synset_id")
 
         # other attributes are accumulated as `records` object.
