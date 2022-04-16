@@ -42,5 +42,13 @@ cfg_embeddings = {
         "use_first_embeddings_only": True,
         "lemma_surface_form_lowercase": False,
         "description": "Semantic Relation Enhanced lemma embeddings used in SREF[Wang and Wang, EMNLP2020]. This embeddings are the post-processing of basic lemma embeddings."
+    },
+    "SREF_basic_lemma_embeddings_without_augmentation": {
+        "path": os.path.join(DIR_SREF_EMBEDDINGS, "emb_glosses_gloss+examples.txt"),
+        "target_pos": ["n","v","s","r"],
+        "l2_norm": False,
+        "use_first_embeddings_only": True,
+        "lemma_surface_form_lowercase": False,
+        "description": "Basic lemma embeddings used in SREF[Wang and Wang, EMNLP2020]. This embeddings are computed without using augmented example sentences."
     }
 }
