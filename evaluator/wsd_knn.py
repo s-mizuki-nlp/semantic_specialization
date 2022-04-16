@@ -84,7 +84,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
 
     def predict(self, input: Dict[str, Any],
                 mfs_reorder_by_lemma_counts: bool = False,
-                output_tie_lemma: bool = False) -> Iterable[str]:
+                output_tie_lemma: bool = False):
         """
         predict the most plausible sense based on conditional probability
 
@@ -138,11 +138,14 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
             lst_scores = (lst_metric_scores, lst_sense_freq_scores)
         else:
             lst_scores = lst_metric_scores
-        return self.return_top_k_lemma_keys(lst_candidate_lemmas, lst_scores, multiple_output=output_tie_lemma)
+
+        lst_predictions = self.return_top_k_lemma_keys(lst_candidate_lemmas, lst_scores, multiple_output=output_tie_lemma)
+        dict_prediction_scores = dict(zip(lst_candidate_lemma_keys, lst_metric_scores))
+        return lst_predictions, dict_prediction_scores
 
     def __iter__(self):
         it = super().__iter__()
-        for inputs_for_predictor, inputs_for_evaluator, ground_truthes, predictions, dict_metrics in it:
+        for inputs_for_predictor, inputs_for_evaluator, ground_truthes, predictions, prediction_scores, dict_metrics in it:
             if self.verbose:
                 print(f"ground truth: {inputs_for_evaluator['lemma']}|{inputs_for_predictor['pos']}")
                 lexnames = list(map(self._lemma_to_lexname, ground_truthes))
@@ -150,10 +153,10 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
                 for lexname, synset_id, ground_truth in zip(lexnames, ground_truth_synset_ids, ground_truthes):
                     print(f"\t{lexname}-{synset_id}-{ground_truth}")
                 print("-------------")
-            yield inputs_for_predictor, inputs_for_evaluator, ground_truthes, predictions, dict_metrics
+            yield inputs_for_predictor, inputs_for_evaluator, ground_truthes, predictions, prediction_scores, dict_metrics
 
     def _print_verbose(self, lst_tup_lemma_and_scores: List[Tuple[wn.lemma, Union[numeric, Tuple[numeric]]]]):
-        print(f"similarity_module: {self._similarity_module}")
+        print(f"similarity_module: {self._similarity_module.__class__.__name__}")
         print(f"candidates:")
         for lemma, scores in lst_tup_lemma_and_scores:
             lexname = lemma.synset().lexname()

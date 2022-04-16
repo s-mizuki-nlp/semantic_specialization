@@ -7,12 +7,11 @@ from __future__ import print_function
 
 
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Dict, Callable, Iterable, Any, List, Union, Set
+from typing import Optional, Dict, Callable, Iterable, Any, List, Union, Set, Tuple
 from collections import defaultdict
 # import pydash
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset
 from nltk.corpus import wordnet as wn
 
 from config_files.wsd_task import WSDTaskDataLoader
@@ -167,7 +166,7 @@ class WSDTaskEvaluatorBase(BaseEvaluatorByRaganato, metaclass=ABCMeta):
         self._predict_kwargs = kwargs
 
     @abstractmethod
-    def predict(self, input: Dict[str, Any], **kwargs) -> Iterable[str]:
+    def predict(self, input: Dict[str, Any], **kwargs) -> Tuple[Iterable[str], Dict[str, float]]:
         pass
 
     def _lemma_to_lexname(self, lemma_or_lemma_key: Union[str, wn.lemma]):
@@ -194,7 +193,8 @@ class WSDTaskEvaluatorBase(BaseEvaluatorByRaganato, metaclass=ABCMeta):
     def predict_batch(self, batch) -> List[Iterable[str]]:
         lst_ret = []
         for record in batch:
-            lst_ret.append(self.predict(record))
+            predictions, _ = self.predict(record)
+            lst_ret.append(predictions)
         return lst_ret
 
     def _get_attr_key_and_values(self, set_attr_names: Set[str], example: Dict[str, str], concat="|"):
@@ -222,10 +222,10 @@ class WSDTaskEvaluatorBase(BaseEvaluatorByRaganato, metaclass=ABCMeta):
 
         """
         for inputs_for_predictor, inputs_for_evaluator in self.iter_records():
-            predictions = self.predict(inputs_for_predictor, **self.predict_kwargs)
+            predictions, prediction_scores = self.predict(inputs_for_predictor, **self.predict_kwargs)
             ground_truthes = inputs_for_evaluator[self._ground_truth_lemma_keys_field_name]
             dict_metrics = self.compute_metrics(ground_truthes, predictions)
-            yield inputs_for_predictor, inputs_for_evaluator, ground_truthes, predictions, dict_metrics
+            yield inputs_for_predictor, inputs_for_evaluator, ground_truthes, predictions, prediction_scores, dict_metrics
 
     def __len__(self):
         if not hasattr(self, "n_sample"):
@@ -242,7 +242,7 @@ class WSDTaskEvaluatorBase(BaseEvaluatorByRaganato, metaclass=ABCMeta):
         dict_dict_results["ALL"] = []
 
         self.predict_kwargs = kwargs
-        for _, inputs_for_evaluator, ground_truthes, predicitons, dict_metrics in self:
+        for _, inputs_for_evaluator, ground_truthes, predicitons, prediction_scores, dict_metrics in self:
             # store metrics
             dict_dict_results["ALL"].append(dict_metrics)
             # breakdown by attributes

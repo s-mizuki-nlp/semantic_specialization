@@ -76,9 +76,11 @@ class MostFrequentSenseWSDTaskEvaluator(WSDTaskEvaluatorBase):
             # candidate order is used as it is.
             return list(range(0, -len(lst_lemmas), -1))
 
-    def predict(self, input: Dict[str, Any], reorder_by_lemma_counts: bool = False, output_tie_lemma: bool = False) -> Iterable[str]:
+    def predict(self, input: Dict[str, Any], reorder_by_lemma_counts: bool = False, output_tie_lemma: bool = False):
         lst_lemmas = self.get_candidate_lemmas_from_wordnet(input["lemma"], input["pos"])
         lst_scores = self.score_by_sense_frequency(lst_lemmas, reorder_by_lemma_count=reorder_by_lemma_counts)
         lst_predicted = self.return_top_k_lemma_keys(lst_lemmas, lst_scores, multiple_output=output_tie_lemma)
+        lst_lemma_keys = [lemma.key() for lemma in lst_lemmas]
+        dict_scores = dict(zip(lst_lemma_keys, lst_scores))
 
-        return lst_predicted
+        return lst_predicted, dict_scores
