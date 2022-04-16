@@ -124,33 +124,35 @@ cfg_training = {
         "max_sequence_length": None,
         "description": "WSD SemCor corpora (excluding no-sense-annotated sentences) encoded by BERT-large-cased. selects noun and verb entity only."
     },
-    "WordNet-Gloss-noun-verb": {
-        "target_pos": ["n","v"],
+    "WordNet-Gloss": {
+        "target_pos": ["n","v","s","r"],
         "concat_extended_examples": False,
         "description": "Automatically annotated WordNet Gloss corpus for noun and verb. compatible with: [Wang and Wang, EMNLP2020]"
     },
-    "Extended-WordNet-Gloss-noun-verb": {
-        "target_pos": ["n","v"],
+    "Extended-WordNet-Gloss": {
+        "target_pos": ["n","v","s","r"],
         "concat_extended_examples": True,
         "lst_path_extended_examples_corpus": [
             os.path.join(DIR_EXT_WORDNET_GLOSS, "sentence_dict_n"),
-            os.path.join(DIR_EXT_WORDNET_GLOSS, "sentence_dict_v")
+            os.path.join(DIR_EXT_WORDNET_GLOSS, "sentence_dict_v"),
+            os.path.join(DIR_EXT_WORDNET_GLOSS, "sentence_dict_a"),
+            os.path.join(DIR_EXT_WORDNET_GLOSS, "sentence_dict_r"),
         ],
-        "description": "Extended WordNet Gloss corpus using extended examples from [Wang and Wang, EMNLP2020]. noun and verb. ref"
+        "description": "Extended WordNet Gloss corpus using extended examples from [Wang and Wang, EMNLP2020]"
     },
-    "WordNet-Gloss-noun-verb-bert-large-cased": {
+    "WordNet-Gloss-bert-large-cased": {
         "path": pick_first_available_path(
-            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_WordNet-Gloss-noun-verb.hdf5"),
-            os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_WordNet-Gloss-noun-verb.hdf5")
+            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_WordNet-Gloss.hdf5"),
+            os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_WordNet-Gloss.hdf5")
         ),
         "padding": False,
         "max_sequence_length": None,
         "description": "WordNet Gloss corpora encoded by BERT-large-cased."
     },
-    "Extended-WordNet-Gloss-noun-verb-bert-large-cased": {
+    "Extended-WordNet-Gloss-bert-large-cased": {
         "path": pick_first_available_path(
-            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_Extended-WordNet-Gloss-noun-verb.hdf5"),
-            os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_Extended-WordNet-Gloss-noun-verb.hdf5")
+            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_Extended-WordNet-Gloss.hdf5"),
+            os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_Extended-WordNet-Gloss.hdf5")
         ),
         "padding": False,
         "max_sequence_length": None,
