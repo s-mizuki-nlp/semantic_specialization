@@ -9,7 +9,7 @@ from nltk.corpus import wordnet as wn
 
 from .wsd_baseline import MostFrequentSenseWSDTaskEvaluator, numeric
 from dataset import WSDTaskDataset
-from dataset.gloss_sref import SREFBasicLemmaEmbeddingsDataset
+from dataset.gloss_sref import SREFLemmaEmbeddingsDataset
 from dataset.utils import tensor_to_numpy, numpy_to_tensor, batch_tile
 from model.similarity import CosineSimilarity, DotProductSimilarity
 
@@ -19,7 +19,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
     def __init__(self,
 
                  evaluation_dataset: WSDTaskDataset,
-                 lemma_key_embeddings_dataset: SREFBasicLemmaEmbeddingsDataset,
+                 lemma_key_embeddings_dataset: SREFLemmaEmbeddingsDataset,
                  gloss_projection_head: torch.nn.Module,
                  context_projection_head: Optional[torch.nn.Module] = None,
                  target_pos: Tuple[str] = ("n","v","a","s","r"),

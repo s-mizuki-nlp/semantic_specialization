@@ -15,12 +15,12 @@ from nltk.corpus import wordnet as wn
 
 from torch.utils.data import Dataset, IterableDataset
 from dataset_preprocessor import utils_wordnet, utils_wordnet_gloss
-from .gloss_sref import SREFBasicLemmaEmbeddingsDataset, WordNetGlossDataset
+from .gloss_sref import SREFLemmaEmbeddingsDataset, WordNetGlossDataset
 from .sense_expansion import extract_lemma_keys_and_weights_from_semantically_related_synsets
 
 class ContrastiveLearningDataset(IterableDataset):
 
-    def __init__(self, corpus_dataset: Union[SREFBasicLemmaEmbeddingsDataset, WordNetGlossDataset],
+    def __init__(self, corpus_dataset: Union[SREFLemmaEmbeddingsDataset, WordNetGlossDataset],
                  iterate_over_lemma_or_lemma_key: str = "lemma_key",
                  semantic_relation_for_positives: str = "all-relations",
                  use_taxonomy_distance_for_sampling_positives: bool = True,

@@ -14,7 +14,7 @@ from nltk.corpus import wordnet as wn
 from torch.utils.data import Dataset
 from dataset_preprocessor import utils_wordnet, utils_wordnet_gloss
 
-class SREFBasicLemmaEmbeddingsDataset(Dataset):
+class SREFLemmaEmbeddingsDataset(Dataset):
 
     def __init__(self, path: str,
                  l2_norm: bool,
@@ -61,6 +61,8 @@ class SREFBasicLemmaEmbeddingsDataset(Dataset):
                 # DUBIOUS: it just accounts for first embedding of each lemma keys.
                 if isinstance(lst_or_numpy_lemma_key_embeddings, list):
                     if isinstance(lst_or_numpy_lemma_key_embeddings[0], list):
+                        vectors = np.array(lst_or_numpy_lemma_key_embeddings[0])
+                    elif isinstance(lst_or_numpy_lemma_key_embeddings[0], np.ndarray):
                         vectors = np.array(lst_or_numpy_lemma_key_embeddings[0])
                     else:
                         vectors = np.array(lst_or_numpy_lemma_key_embeddings)
