@@ -163,9 +163,15 @@ class WSDTaskDataset(IterableDataset):
             obj_sentence["entity_sequence_lengths"] = dict_entity_embeddings["sequence_lengths"]
 
             if self._return_entity_subwords_avg_vector:
-                obj_sentence["entity_span_avg_vectors"] = calc_entity_subwords_average_vectors(
-                                                            context_embeddings=obj_sentence["embedding"],
-                                                            lst_lst_entity_subword_spans=lst_lst_entity_spans)
+                if "entity_span_avg_vectors" in obj_sentence:
+                    pass
+                elif "embedding" in obj_sentence:
+                    # compute entity span average vectors on-the-fly.
+                    obj_sentence["entity_span_avg_vectors"] = calc_entity_subwords_average_vectors(
+                                                                context_embeddings=obj_sentence["embedding"],
+                                                                lst_lst_entity_subword_spans=lst_lst_entity_spans)
+                else:
+                    raise AttributeError(f"neither `entity_span_avg_vectors` nor `embedding` in the record.")
             # (optional) weighted average over entity embeddings and sentence embedding
             obj_sentence["entity_embeddings"] = self._weighed_average_on_entity_embeddings(
                                                             entity_embeddings=obj_sentence["entity_embeddings"],
