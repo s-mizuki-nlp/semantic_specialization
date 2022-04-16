@@ -17,8 +17,7 @@ from nltk.corpus import wordnet as wn
 
 from config_files.wsd_task import WSDTaskDataLoader
 from dataset import WSDTaskDataset
-from dataset.lexical_knowledge import SynsetDataset
-
+from dataset_preprocessor import utils_wordnet_gloss
 
 class BaseEvaluator(object):
 
@@ -173,13 +172,15 @@ class WSDTaskEvaluatorBase(BaseEvaluatorByRaganato, metaclass=ABCMeta):
 
     def _lemma_to_lexname(self, lemma_or_lemma_key: Union[str, wn.lemma]):
         if isinstance(lemma_or_lemma_key, str):
-            lemma = wn.lemma_from_key(lemma_or_lemma_key)
-        return lemma.synset().lexname()
+            return utils_wordnet_gloss.lemma_key_to_lexname(lemma_or_lemma_key)
+        else:
+            return lemma_or_lemma_key.synset().lexname()
 
     def _lemma_to_synset_id(self, lemma_or_lemma_key: Union[str, wn.lemma]):
         if isinstance(lemma_or_lemma_key, str):
-            lemma = wn.lemma_from_key(lemma_or_lemma_key)
-        return lemma.synset().name()
+            return utils_wordnet_gloss.lemma_key_to_synset_id(lemma_key=lemma_or_lemma_key)
+        else:
+            return lemma_or_lemma_key.synset().name()
 
     def compute_metrics(self, ground_truthes: Iterable[str], predictions: Iterable[str]):
         if self._evaluation_category == "lexname":
