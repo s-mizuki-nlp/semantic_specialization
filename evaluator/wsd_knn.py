@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-
+import warnings
 from typing import Dict, Any, Iterable, Optional, Set, Union, Tuple, List
 
 import numpy as np
@@ -17,9 +17,11 @@ from model.similarity import CosineSimilarity, DotProductSimilarity
 class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
 
     def __init__(self,
-                 projection_head,
+
                  evaluation_dataset: WSDTaskDataset,
                  lemma_key_embeddings_dataset: SREFBasicLemmaEmbeddingsDataset,
+                 gloss_projection_head: torch.nn.Module,
+                 context_projection_head: Optional[torch.nn.Module] = None,
                  target_pos: Tuple[str] = ("n","v","a","s","r"),
                  similarity_module: Union[str, torch.nn.Module] = "cosine",
                  evaluation_category: str = "lemma",
@@ -39,9 +41,14 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
             **kwargs_dataloader)
 
         self._entity_embedding_field_name = entity_embedding_field_name
-        self._prjection_head = projection_head
         self._lemma_key_embeddings_dataset = lemma_key_embeddings_dataset
         self._target_pos = target_pos
+        self._gloss_prjection_head = gloss_projection_head
+        if context_projection_head is None:
+            warnings.warn(f"gloss_projection_head will be used as context_projection_head.")
+            self._context_projection_head = gloss_projection_head
+        else:
+            self._context_projection_head = context_projection_head
 
         if isinstance(similarity_module, str):
             if similarity_module == "cosine":
@@ -115,8 +122,8 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
             t_query_embedding = torch.mean(t_query_embedding, dim=1)
 
         # inference using k-NN method.
-        t_candidate_lemma_key_embeddings = self._prjection_head.predict(t_candidate_lemma_key_embeddings)
-        t_query_embedding = self._prjection_head.predict(t_query_embedding)
+        t_candidate_lemma_key_embeddings = self._gloss_prjection_head.predict(t_candidate_lemma_key_embeddings)
+        t_query_embedding = self._context_projection_head.predict(t_query_embedding)
         t_query_embeddings = torch.tile(t_query_embedding, (n_candidates, 1))
         assert t_candidate_lemma_key_embeddings.shape == t_query_embeddings.shape, f"query and candidate shape mismatch."
 
