@@ -2,7 +2,6 @@
 # -*- coding:utf-8 -*-
 
 from typing import List, Set
-from anytree import AnyNode
 from functools import lru_cache
 
 import nltk
