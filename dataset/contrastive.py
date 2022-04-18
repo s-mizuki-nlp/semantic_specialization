@@ -15,7 +15,8 @@ from nltk.corpus import wordnet as wn
 
 from torch.utils.data import Dataset, IterableDataset
 from dataset_preprocessor import utils_wordnet, utils_wordnet_gloss
-from .gloss_sref import SREFLemmaEmbeddingsDataset, WordNetGlossDataset
+from .gloss_embeddings import SREFLemmaEmbeddingsDataset
+from .gloss import WordNetGlossDataset
 from .sense_expansion import extract_lemma_keys_and_weights_from_semantically_related_synsets
 
 class ContrastiveLearningDataset(IterableDataset):
