@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 import warnings
-from typing import Dict, Callable, Optional, List, Union, Tuple, Iterable
+from typing import Dict, Callable, Optional, List, Union, Tuple, Iterable, Any
 from transformers import AutoTokenizer, AutoModel
 from transformers.tokenization_utils_base import BatchEncoding
 import torch
@@ -321,6 +321,12 @@ def convert_compressed_format_to_batch_format(embeddings: Array_like,
         "attention_mask": attention_mask
     }
     return dict_ret
+
+def extract_entity_spans_from_record(record: Dict[str, Any],
+                                     entity_field_name: str,
+                                     span_field_name: str):
+    lst_entity_spans = [entity[span_field_name] for entity in record[entity_field_name]]
+    return lst_entity_spans
 
 def calc_entity_subwords_average_vectors(context_embeddings: Array_like,
                                          lst_lst_entity_subword_spans: List[List[Tuple[int, int]]]

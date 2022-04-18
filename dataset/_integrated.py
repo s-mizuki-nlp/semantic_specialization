@@ -11,7 +11,7 @@ from .lexical_knowledge import LemmaDataset, SynsetDataset
 
 from torch.nn import functional as F
 from torch.utils.data import IterableDataset
-from .encoder import extract_entity_subword_embeddings, calc_entity_subwords_average_vectors
+from .encoder import extract_entity_subword_embeddings, calc_entity_subwords_average_vectors, extract_entity_spans_from_record
 from . import utils
 from dataset_preprocessor import utils_wordnet, utils_wordnet_gloss
 
@@ -42,11 +42,6 @@ class WSDTaskDataset(IterableDataset):
         self._excludes = set() if excludes is None else excludes
 
     @classmethod
-    def extract_entity_spans_from_record(cls, record: Dict[str, Any],
-                                         entity_field_name: str,
-                                         span_field_name: str):
-        lst_entity_spans = [entity[span_field_name] for entity in record[entity_field_name]]
-        return lst_entity_spans
 
     def _copy_fields(self, dict_source: Dict[str, Any], dict_target: Dict[str, Any],
                      copy_field_names: Optional[Iterable[str]] = None):
@@ -151,9 +146,9 @@ class WSDTaskDataset(IterableDataset):
         """
         for obj_sentence in self._bert_embeddings:
             record = obj_sentence["record"]
-            lst_lst_entity_spans = self.extract_entity_spans_from_record(record,
-                                                                         entity_field_name=self._record_entity_field_name,
-                                                                         span_field_name=self._record_entity_span_field_name)
+            lst_lst_entity_spans = extract_entity_spans_from_record(record,
+                                                                    entity_field_name=self._record_entity_field_name,
+                                                                    span_field_name=self._record_entity_span_field_name)
             # keys: embeddings, sequence_lengths
             dict_entity_embeddings = extract_entity_subword_embeddings(
                                      context_embeddings=obj_sentence["embedding"],
