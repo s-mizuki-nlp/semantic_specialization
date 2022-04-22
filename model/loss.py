@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
-from typing import Union, List
+from typing import Union, List, Optional
 import torch
 from torch import nn
 from torch.nn.modules import loss as L
@@ -27,24 +27,61 @@ def _create_mask_tensor(seq_lens: Union[np.ndarray, torch.LongTensor]):
 
 class ContrastiveLoss(L._Loss):
 
-    def __init__(self, similarity_module: nn.Module, size_average=None, reduce=None, reduction: str = "mean"):
+    def __init__(self, similarity_module: nn.Module,
+                 use_positives_as_in_batch_negatives: bool,
+                 size_average=None, reduce=None, reduction: str = "mean"):
         super(ContrastiveLoss, self).__init__(size_average, reduce, reduction)
         self._similarity = similarity_module
+        self._use_positives_as_in_batch_negatives = use_positives_as_in_batch_negatives
         self._size_average = size_average
         self._reduce = reduce
         self._reduction = reduction
 
-    def forward(self, queries: torch.Tensor, positives: torch.Tensor, negatives: torch.Tensor, num_negative_samples: torch.LongTensor):
+    def get_off_diagonal_elements(self, squared_tensor):
+        n = squared_tensor.shape[0]
+        return squared_tensor.flatten()[1:].view(n-1, n+1)[:,:-1].reshape(n, n-1)
+
+    def forward(self, queries: torch.Tensor, positives: torch.Tensor, negatives: Optional[torch.Tensor] = None, num_negative_samples: Optional[torch.LongTensor] = None):
         # queries, positives: (n, n_dim)
         # negatives: (n, n_neg = max({n^neg_i};0<=i<n), n_dim)
         # num_negative_samples: (n,)
         # num_negative_samples[i] = [1, n_neg]; number of effective negative samples for i-th example.
 
+        if not self._use_positives_as_in_batch_negatives:
+            assert negatives is not None, f"you must feed `negatives` because `use_positives_as_in_batch_negatives=False`"
+
+        n_batch, device = queries.shape[0], queries.device
+
         # vec_sim_pos: (n,)
         # is_hard_examples: affects when similarity_module is ArcMarginProduct.
         vec_sim_pos = self._similarity(queries, positives, is_hard_examples = True)
-        # mat_sim_neg: (n, n_neg)
-        mat_sim_neg = self._similarity(queries.unsqueeze(dim=1), negatives, is_hard_examples=False)
+
+        # in-batch negatives: (n, n-1)
+        if self._use_positives_as_in_batch_negatives:
+            # mat_sim: (n, n)
+            mat_sim = self._similarity(queries.unsqueeze(dim=1), positives)
+            # we extract off-diagonal elements as the in-batch negatives.
+            mat_sim_neg_in_batch = self.get_off_diagonal_elements(mat_sim)
+        else:
+            mat_sim_neg_in_batch = None
+
+        # (optional) explicit negatives: (n, n_neg)
+        if negatives is not None:
+            mat_sim_neg_explicit = self._similarity(queries.unsqueeze(dim=1), negatives, is_hard_examples=False)
+        else:
+            mat_sim_neg_explicit = None
+
+        # concat with in-batch negatives
+        if (mat_sim_neg_in_batch is not None) and (mat_sim_neg_explicit is not None):
+            # mat_sim_neg: (n, n-1+n_neg)
+            mat_sim_neg = torch.cat([mat_sim_neg_in_batch, mat_sim_neg_explicit], dim=-1)
+            num_negative_samples = num_negative_samples + (n_batch-1)
+        elif (mat_sim_neg_in_batch is not None):
+            mat_sim_neg = mat_sim_neg_in_batch
+            num_negative_samples = torch.tensor([n_batch-1]*n_batch, device=device)
+        elif (mat_sim_neg_explicit is not None):
+            mat_sim_neg = mat_sim_neg_explicit
+
         # fill -inf with masked positions
         mask_tensor = _create_mask_tensor(num_negative_samples)
         mat_sim_neg = mat_sim_neg.masked_fill_(mask_tensor, value=-float("inf"))
