@@ -17,7 +17,7 @@ DIR_EVALSET_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/
 DIR_TRAINSET = "/home/sakae/Windows/dataset/word_sense_disambiguation/WSD_Training_Corpora/"
 DIR_TRAINSET_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/WSD_Training_Corpora/SemCor/bert_embeddings/"
 DIR_WORDNET_GLOSS = "/home/sakae/Windows/dataset/word_sense_disambiguation/wordnet_gloss_corpus/"
-DIR_WORDNET_GLOSS_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/wordnet_gloss_corpus/SREF/bert_embeddings/"
+DIR_WORDNET_GLOSS_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/wordnet_gloss_corpus/bert_embeddings/"
 DIR_EXT_WORDNET_GLOSS = "/home/sakae/Windows/dataset/word_sense_disambiguation/wordnet_gloss_augmentation/"
 DIR_TRAIN_UNSUPERVISED_LOCAL = "/tmp/sakae/"
 
@@ -36,21 +36,6 @@ cfg_evaluation = {
         "num_concat_surrounding_sentences": 2,
         "description": "WSD Evaluation Framework dataset [Raganato+, 2017]: Concatenates both before and after two sentences in the same document. ALL PoS tags.",
     },
-    "WSDEval-noun-verb": {
-        "path_corpus": os.path.join(DIR_EVALSET, "ALL/ALL.data.xml"),
-        "path_ground_truth_labels": os.path.join(DIR_EVALSET, "ALL/ALL.gold.key.txt"),
-        "lookup_candidate_senses": True,
-        "entity_filter_function": _noun_verb_entity_selector,
-        "description": "WSD Evaluation Framework dataset [Raganato+, 2017]: Noun and verb entity only.",
-    },
-    "WSDEval-noun-verb-concat-2": {
-        "path_corpus": os.path.join(DIR_EVALSET, "ALL/ALL.data.xml"),
-        "path_ground_truth_labels": os.path.join(DIR_EVALSET, "ALL/ALL.gold.key.txt"),
-        "lookup_candidate_senses": True,
-        "num_concat_surrounding_sentences": 2,
-        "entity_filter_function": _noun_verb_entity_selector,
-        "description": "WSD Evaluation Framework dataset [Raganato+, 2017]: Concatenates both before and after two sentences in the same document. Noun and verb entity only.",
-    },
     "WSDEval-ALL-bert-large-cased": {
         "path":os.path.join(DIR_EVALSET_EMBEDDINGS, "bert-large-cased_wsdeval-all.hdf5"),
         "padding": False,
@@ -65,35 +50,13 @@ cfg_evaluation = {
         "filter_function":None,
         "description": "WSD Evaluation Framework dataset [Raganato+, 2017] encoded by BERT-large-cased. Concatenates both before and after two sentences in the same document."
     },
-    "WSDEval-noun-verb-bert-large-cased": {
-        "path":os.path.join(DIR_EVALSET_EMBEDDINGS, "bert-large-cased_WSDEval-noun-verb.hdf5"),
-        "padding": False,
-        "max_sequence_length": None,
-        "filter_function":None,
-        "description": "WSD Evaluation Framework dataset [Raganato+, 2017]: Noun and verb entity only, encoded by BERT-large-cased."
-    },
-    "WSDEval-noun-verb-concat-2-bert-large-cased": {
-        "path":os.path.join(DIR_EVALSET_EMBEDDINGS, "bert-large-cased_WSDEval-noun-verb-concat-2.hdf5"),
-        "padding": False,
-        "max_sequence_length": None,
-        "filter_function":None,
-        "description": """WSD Evaluation Framework dataset [Raganato+, 2017]: Concatenates both before and after two sentences in the same document.\n
-Noun and verb entity only. encoded by BERT-large-cased."""
-    },
     "WSDEval-ALL-mwe0.5-bert-large-cased": {
         "path":os.path.join(DIR_EVALSET_EMBEDDINGS, "bert-large-cased_WSDEval-ALL_mwe-0.5.hdf5"),
         "padding": False,
         "max_sequence_length": None,
         "filter_function":None,
         "description": "WSD Evaluation Framework dataset [Raganato+, 2017] encoded by BERT-large-cased. Weighted avg between entity embeddigns and masked word embeddings."
-    },
-    "WSDEval-noun-verb-mwe-0.5-bert-large-cased": {
-        "path":os.path.join(DIR_EVALSET_EMBEDDINGS, "bert-large-cased_WSDEval-noun-verb_mwe-0.5.hdf5"),
-        "padding": False,
-        "max_sequence_length": None,
-        "filter_function":None,
-        "description": "WSD Evaluation Framework dataset [Raganato+, 2017]: Noun and verb entity only, encoded by BERT-large-cased. Weighted avg between entity embeddigns and masked word embeddings."
-    },
+    }
 }
 
 cfg_training = {
@@ -104,51 +67,28 @@ cfg_training = {
         "filter_function": _no_entity_sentence_filter,
         "description": "WSD SemCor corpora, excluding no-sense-annotated sentences.",
     },
-    "SemCor-noun-verb": {
-        "path_corpus": os.path.join(DIR_TRAINSET, "SemCor/semcor.data.xml"),
-        "path_ground_truth_labels": os.path.join(DIR_TRAINSET, "SemCor/semcor.gold.key.txt"),
-        "lookup_candidate_senses": True,
-        "filter_function": _no_entity_sentence_filter,
-        "entity_filter_function": _noun_verb_entity_selector,
-        "description": "WSD SemCor corpora, excluding no-sense-annotated sentences. selects noun and verb entity only.",
-    },
     "SemCor-bert-large-cased": {
         "path":os.path.join(DIR_TRAINSET_EMBEDDINGS, "bert-large-cased_SemCor.hdf5"),
         "padding": False,
         "max_sequence_length": None,
         "description": "WSD SemCor corpora (excluding no-sense-annotated sentences) encoded by BERT-large-cased."
     },
-    "SemCor-noun-verb-bert-large-cased": {
-        "path":os.path.join(DIR_TRAINSET_EMBEDDINGS, "bert-large-cased_SemCor-noun-verb.hdf5"),
-        "padding": False,
-        "max_sequence_length": None,
-        "description": "WSD SemCor corpora (excluding no-sense-annotated sentences) encoded by BERT-large-cased. selects noun and verb entity only."
-    },
-    "WordNet-Gloss-bert-large-cased": {
+    "WordNet_Gloss_Corpus-bert-large-cased": {
         "path": pick_first_available_path(
-            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_WordNet-Gloss.hdf5"),
-            os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_WordNet-Gloss.hdf5")
+            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_WordNet_Gloss_Corpus.hdf5"),
+            os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_WordNet_Gloss_Corpus.hdf5")
         ),
         "padding": False,
         "max_sequence_length": None,
         "description": "WordNet Gloss corpora encoded by BERT-large-cased."
     },
-    "Extended-WordNet-Gloss-bert-large-cased": {
+    "SREF_Sense_Corpus-Gloss-bert-large-cased": {
         "path": pick_first_available_path(
-            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_Extended-WordNet-Gloss.hdf5"),
-            os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_Extended-WordNet-Gloss.hdf5")
+            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_SREF_Sense_Corpus.hdf5"),
+            os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_SREF_Sense_Corpus.hdf5")
         ),
         "padding": False,
         "max_sequence_length": None,
-        "description": "Extended WordNet Gloss corpora encoded by BERT-large-cased."
-    },
-    "Extended-WordNet-Gloss-noun-verb-mwe0.5-bert-large-cased": {
-        "path": pick_first_available_path(
-            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_Extended-WordNet-Gloss-noun-verb_mwe-0.5.hdf5"),
-            os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_Extended-WordNet-Gloss-noun-verb_mwe-0.5.hdf5")
-        ),
-        "padding": False,
-        "max_sequence_length": None,
-        "description": "Extended WordNet Gloss corpora encoded by BERT-large-cased. Weighted avg between entity embeddigns and masked word embeddings."
-    },
+        "description": "Extended WordNet Gloss corpora (used in [Wang and Wang, EMNLP2020]) encoded by BERT-large-cased."
+    }
 }
