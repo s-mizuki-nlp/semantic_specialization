@@ -6,6 +6,8 @@ import os
 DIR_SREF_CORPUS = "/home/sakae/Windows/dataset/word_sense_disambiguation/SREF/corpus/"
 DIR_SREF_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/SREF/vectors/"
 
+from .sense_annotated_corpus import cfg_training
+
 # evaluation dataset for all-words WSD task
 cfg_gloss_corpus = {
     "SREF_Sense_Corpus": {
@@ -50,5 +52,26 @@ cfg_embeddings = {
         "use_first_embeddings_only": True,
         "lemma_surface_form_lowercase": False,
         "description": "Basic lemma embeddings used in SREF[Wang and Wang, EMNLP2020]. This embeddings are computed without using augmented example sentences."
+    },
+    "Extended-WordNet-Gloss-CLS-bert-large-cased": {
+        "kwargs_bert_embeddings_dataset": cfg_training["Extended-WordNet-Gloss-bert-large-cased"],
+        "pooling_method": "cls",
+        "l2_norm": False,
+        "use_first_embeddings_only": True,
+        "description": "[CLS] token of WordNet Gloss sentence."
+    },
+    "Extended-WordNet-Gloss-AVG-bert-large-cased": {
+        "kwargs_bert_embeddings_dataset": cfg_training["Extended-WordNet-Gloss-bert-large-cased"],
+        "pooling_method": "average",
+        "l2_norm": False,
+        "use_first_embeddings_only": True,
+        "description": "Average pooling over all subword tokens of WordNet Gloss sentence."
+    },
+    "Extended-WordNet-Gloss-ENTITY-bert-large-cased": {
+        "kwargs_bert_embeddings_dataset": cfg_training["Extended-WordNet-Gloss-bert-large-cased"],
+        "pooling_method": "entity",
+        "l2_norm": False,
+        "use_first_embeddings_only": True,
+        "description": "Average pooling over entity subword span of WordNet Gloss sentence."
     }
 }
