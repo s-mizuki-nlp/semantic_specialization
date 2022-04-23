@@ -6,7 +6,7 @@ import torch
 import pydash
 from dataset import utils
 
-class ContrastiveDatasetCollateFunction(object):
+class ContrastiveDatasetEmbeddingsCollateFunction(object):
 
     def __init__(self,
                  device: Optional[str] = "cpu"):
