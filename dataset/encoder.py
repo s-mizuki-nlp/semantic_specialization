@@ -16,7 +16,7 @@ class BERTEmbeddings(object):
                  layers: List[int] = [-4,-3,-2,-1],
                  return_compressed_format: bool = True,
                  return_numpy_array: bool = False,
-                 ignore_too_long_sequence: bool = True,
+                 ignore_too_long_sequence: bool = False,
                  device_ids: Optional[List[int]] = None,
                  **kwargs):
         if isinstance(model_or_name, str):
