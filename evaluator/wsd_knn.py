@@ -70,7 +70,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
 
         """
         lst_records = self._lemma_key_embeddings_dataset.get_records_by_lemma_key(lemma_key=lemma_key)
-        assert len(lst_records) == 1, f"record must be unique for each lemma key."
+        assert len(lst_records) == 1, f"record must be unique for each lemma key: {lemma_key}"
         record = lst_records[0]
         assert lemma_key in record["ground_truth_lemma_keys"], f"lemma key lookup failure: {lemma_key}"
 

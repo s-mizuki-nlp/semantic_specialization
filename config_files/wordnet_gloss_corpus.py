@@ -53,25 +53,18 @@ cfg_embeddings = {
         "lemma_surface_form_lowercase": False,
         "description": "Basic lemma embeddings used in SREF[Wang and Wang, EMNLP2020]. This embeddings are computed without using augmented example sentences."
     },
-    "SREF_Sense_Corpus-CLS-bert-large-cased": {
+    "SREF_Sense_Corpus-ANY-bert-large-cased": {
         "kwargs_bert_embeddings_dataset": cfg_training["SREF_Sense_Corpus-bert-large-cased"],
-        "pooling_method": "cls",
+        "pooling_method": None,
         "l2_norm": False,
         "use_first_embeddings_only": True,
-        "description": "[CLS] token of WordNet Gloss sentence."
+        "description": "SREF Extended WordNet Gloss sentence embeddings."
     },
-    "SREF_Sense_Corpus-AVG-bert-large-cased": {
-        "kwargs_bert_embeddings_dataset": cfg_training["SREF_Sense_Corpus-bert-large-cased"],
+    "WordNet_Gloss_Corpus-ANY-bert-large-cased": {
+        "kwargs_bert_embeddings_dataset": cfg_training["WordNet_Gloss_Corpus-bert-large-cased"],
         "pooling_method": "average",
         "l2_norm": False,
         "use_first_embeddings_only": True,
-        "description": "Average pooling over all subword tokens of WordNet Gloss sentence."
-    },
-    "SREF_Sense_Corpus-ENTITY-bert-large-cased": {
-        "kwargs_bert_embeddings_dataset": cfg_training["SREF_Sense_Corpus-bert-large-cased"],
-        "pooling_method": "entity",
-        "l2_norm": False,
-        "use_first_embeddings_only": True,
-        "description": "Average pooling over entity subword span of WordNet Gloss sentence."
+        "description": "WordNet Gloss sentence embeddings."
     }
 }
