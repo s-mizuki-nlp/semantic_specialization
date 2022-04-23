@@ -1,20 +1,14 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
-from typing import Union, List, Optional, Callable, Iterable, Dict, Any
-import os, sys, io
-import copy, pickle, random
-from collections import defaultdict
-from functools import lru_cache
+from typing import Union, Optional
+import copy, random
 import warnings
-from tqdm import tqdm
 
 import numpy as np
-from nltk import word_tokenize
-from nltk.corpus import wordnet as wn
 
-from torch.utils.data import Dataset, IterableDataset
-from dataset_preprocessor import utils_wordnet, utils_wordnet_gloss
+from torch.utils.data import IterableDataset
+from dataset_preprocessor import utils_wordnet_gloss
 from .gloss_embeddings import SREFLemmaEmbeddingsDataset
 from .gloss import WordNetGlossDataset
 from .sense_expansion import extract_lemma_keys_and_weights_from_semantically_related_synsets
