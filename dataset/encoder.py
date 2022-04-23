@@ -181,11 +181,14 @@ class BERTEmbeddings(object):
         token_info = self.tokenize(lst_lst_words=lst_lst_words, add_special_tokens=add_special_tokens, **kwargs)
 
         # verify
-        if self._ignore_too_long_sequence:
-            n_seq_len = token_info["input_ids"].shape[-1]
-            if n_seq_len > self._tokenizer.model_max_length:
+        n_seq_len = token_info["input_ids"].shape[-1]
+        if n_seq_len > self._tokenizer.model_max_length:
+            if self._ignore_too_long_sequence:
                 warnings.warn("sequence is too long. skip encoding.")
                 return {}
+            else:
+                warnings.warn(f"sequence is too long. tokenizer will truncate to fit into model max seq. length: {self._tokenizer.model_max_length}")
+                token_info = self.tokenize(lst_lst_words=lst_lst_words, add_special_tokens=add_special_tokens, truncation=True, **kwargs)
 
         # calculate subword-level entity spans
         lst_lst_entity_subword_spans = []
