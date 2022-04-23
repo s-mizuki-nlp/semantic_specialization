@@ -55,14 +55,14 @@ cfg_embeddings = {
     },
     "SREF_Sense_Corpus-ANY-bert-large-cased": {
         "kwargs_bert_embeddings_dataset": cfg_training["SREF_Sense_Corpus-bert-large-cased"],
-        "pooling_method": None,
+        # "pooling_method": None,
         "l2_norm": False,
         "use_first_embeddings_only": True,
         "description": "SREF Extended WordNet Gloss sentence embeddings."
     },
     "WordNet_Gloss_Corpus-ANY-bert-large-cased": {
         "kwargs_bert_embeddings_dataset": cfg_training["WordNet_Gloss_Corpus-bert-large-cased"],
-        "pooling_method": "average",
+        # "pooling_method": None,
         "l2_norm": False,
         "use_first_embeddings_only": True,
         "description": "WordNet Gloss sentence embeddings."
