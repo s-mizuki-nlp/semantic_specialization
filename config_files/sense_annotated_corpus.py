@@ -82,7 +82,7 @@ cfg_training = {
         "max_sequence_length": None,
         "description": "WordNet Gloss corpora encoded by BERT-large-cased."
     },
-    "SREF_Sense_Corpus-Gloss-bert-large-cased": {
+    "SREF_Sense_Corpus-bert-large-cased": {
         "path": pick_first_available_path(
             os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_SREF_Sense_Corpus.hdf5"),
             os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_SREF_Sense_Corpus.hdf5")
