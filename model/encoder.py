@@ -53,6 +53,43 @@ class MultiLayerPerceptron(nn.Module):
         with torch.no_grad():
             return self.forward(x)
 
+
+class RestrictedShift(nn.Module):
+
+    def __init__(self, n_dim_in, max_l2_norm: float,
+                 n_dim_hidden, n_layer, activation_function = torch.relu,
+                 bias: bool = False):
+        """
+        this module shifts input vector up to max L2 norm.
+        let x as input, d as number of dimensions, \sigma as sigmoid function, F(x) as the multi-layer perceptron, output will be written as follows.
+        output = x + \epsilon (2 \sigma(F(x)) - 1); \epsilon = max_l2_norm / \sqr{d}
+
+        :param n_dim_in: input dimension size
+        :param max_l2_norm: maximum L2 norm of shift vector.
+        :param n_dim_hidden: MLP hidden layer dimension size
+        :param n_layer: MLP number of layers
+        :param activation_function: MLP activation function. e.g. torch.relu
+        """
+        super().__init__()
+
+        self._ffn = MultiLayerPerceptron(n_dim_in=n_dim_in, n_dim_out=n_dim_in, n_dim_hidden=n_dim_hidden, n_layer=n_layer, activation_function=activation_function, bias=bias)
+        self._max_l2_norm = max_l2_norm
+        self._n_dim = n_dim_in
+        self._epsilon = max_l2_norm / np.sqrt(n_dim_in)
+
+    def forward(self, x):
+        z = self._ffn.forward(x)
+        # transform to [-1, 1]
+        dx = 2. * torch.sigmoid(z) - 1.
+        y = x + self._epsilon * dx
+
+        return y
+
+    def predict(self, x):
+        with torch.no_grad():
+            return self.forward(x)
+
+
 class Identity(nn.Module):
 
     def __init__(self, **kwargs):
