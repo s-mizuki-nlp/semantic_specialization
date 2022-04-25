@@ -9,13 +9,13 @@ import numpy as np
 
 from torch.utils.data import IterableDataset
 from dataset_preprocessor import utils_wordnet_gloss
-from .gloss_embeddings import SREFLemmaEmbeddingsDataset
+from .gloss_embeddings import SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset
 from .gloss import WordNetGlossDataset
 from .sense_expansion import extract_lemma_keys_and_weights_from_semantically_related_synsets
 
 class ContrastiveLearningDataset(IterableDataset):
 
-    def __init__(self, corpus_dataset: Union[SREFLemmaEmbeddingsDataset, WordNetGlossDataset],
+    def __init__(self, gloss_dataset: Union[SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset, WordNetGlossDataset],
                  iterate_over_lemma_or_lemma_key: str = "lemma_key",
                  semantic_relation_for_positives: str = "all-relations",
                  use_taxonomy_distance_for_sampling_positives: bool = True,
@@ -24,11 +24,11 @@ class ContrastiveLearningDataset(IterableDataset):
         """
 
         Args:
-            corpus_dataset:
+            gloss_dataset:
             semantic_relation_for_positives: "all-relations", "all-relations-but-hyponymy", "all-relations-but-synonymy", "hyponymy"
             num_hard_negatives: number of hard negative examples these are homographs of the target lemma. 0: None, -1: all homographs, N: as many as N homographs.
         """
-        self._corpus_dataset = corpus_dataset
+        self._gloss_dataset = gloss_dataset
         self._num_hard_negatives = num_hard_negatives
         self._semantic_relation_for_positives = semantic_relation_for_positives
         self._use_taxonomy_distance_for_sampling_positives = use_taxonomy_distance_for_sampling_positives
@@ -37,15 +37,15 @@ class ContrastiveLearningDataset(IterableDataset):
 
     def __len__(self):
         if self._iterate_over_lemma_or_lemma_key == "lemma_key":
-            return len(self._corpus_dataset.get_lemma_keys())
+            return len(self._gloss_dataset.get_lemma_keys())
         elif self._iterate_over_lemma_or_lemma_key == "lemma":
-            return len(self._corpus_dataset.get_lemma_and_pos())
+            return len(self._gloss_dataset.get_lemma_and_pos())
 
     def iter_by_lemma_keys(self, shuffle: bool = True):
         """
         iterate over all lemma keys once.
         """
-        lst_lemma_keys = self._corpus_dataset.get_lemma_keys()
+        lst_lemma_keys = self._gloss_dataset.get_lemma_keys()
         if shuffle:
             random.shuffle(lst_lemma_keys)
 
@@ -55,7 +55,7 @@ class ContrastiveLearningDataset(IterableDataset):
                 yield record
 
     def iter_by_lemma_and_pos(self, shuffle: bool = True):
-        lst_tup_lemma_and_pos = self._corpus_dataset.get_lemma_and_pos()
+        lst_tup_lemma_and_pos = self._gloss_dataset.get_lemma_and_pos()
         if shuffle:
             random.shuffle(lst_tup_lemma_and_pos)
 
@@ -74,14 +74,14 @@ class ContrastiveLearningDataset(IterableDataset):
 
         # query
         if query_lemma_key is None:
-            lst_lemma_keys = self._corpus_dataset.get_lemma_keys_by_lemma_and_pos(lemma, pos)
+            lst_lemma_keys = self._gloss_dataset.get_lemma_keys_by_lemma_and_pos(lemma, pos)
             query_lemma_key = random.choice(lst_lemma_keys)
         else:
             if lemma is None:
                 lemma = utils_wordnet_gloss.lemma_key_to_lemma_name(query_lemma_key)
             if pos is None:
                 pos = utils_wordnet_gloss.lemma_key_to_pos(query_lemma_key, tagtype="short") # it returns one of ["n","v","s","r"]
-            lst_lemma_keys = self._corpus_dataset.get_lemma_keys_by_lemma_and_pos(lemma, pos)
+            lst_lemma_keys = self._gloss_dataset.get_lemma_keys_by_lemma_and_pos(lemma, pos)
 
         synset_id = utils_wordnet_gloss.lemma_key_to_synset_id(query_lemma_key)
 
@@ -123,11 +123,11 @@ class ContrastiveLearningDataset(IterableDataset):
         # prepare contrastive example object
         lst_hard_negatives = []
         for lemma_key in lst_hard_negative_lemma_keys:
-            lst_hard_negatives.extend(self._corpus_dataset.get_records_by_lemma_key(lemma_key))
+            lst_hard_negatives.extend(self._gloss_dataset.get_records_by_lemma_key(lemma_key))
 
         dict_result = {
-            "query": self._corpus_dataset.get_records_by_lemma_key(query_lemma_key)[0],
-            "positive": self._corpus_dataset.get_records_by_lemma_key(positive_lemma_key)[0],
+            "query": self._gloss_dataset.get_records_by_lemma_key(query_lemma_key)[0],
+            "positive": self._gloss_dataset.get_records_by_lemma_key(positive_lemma_key)[0],
             "hard_negatives": lst_hard_negatives,
             "num_hard_negatives": len(lst_hard_negatives)
         }
@@ -139,5 +139,9 @@ class ContrastiveLearningDataset(IterableDataset):
         lst_attr_names = "num_hard_negatives,semantic_relation_for_positives,use_taxonomy_distance_for_sampling_positives,iterate_over_lemma_or_lemma_key,shuffle".split(",")
         ret = {attr_name:getattr(self, "_" + attr_name) for attr_name in lst_attr_names}
         ret["__len__"] = self.__len__()
-        ret["corpus_dataset"] = self._corpus_dataset.verbose
+        ret["corpus_dataset"] = self._gloss_dataset.verbose
         return ret
+
+    @property
+    def gloss_dataset(self):
+        return self._gloss_dataset
