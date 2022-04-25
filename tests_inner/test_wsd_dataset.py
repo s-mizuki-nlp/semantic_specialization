@@ -7,15 +7,15 @@ import unittest
 from nltk.corpus import wordnet as wn
 from bs4 import BeautifulSoup
 
-from dataset.evaluation import WSDEvaluationDataset
-from config_files.sense_annotated_corpus import word_sense_disambiguation
+from dataset import WSDTaskDataset
+from config_files.sense_annotated_corpus import cfg_evaluation
 
 
 class WSDEvaluationDatasetTestCases(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._dataset = WSDEvaluationDataset(**word_sense_disambiguation["ALL"])
+        cls._dataset = WSDTaskDataset(**cfg_evaluation["WSDEval-ALL"])
 
     def test_xml_parse(self):
 
