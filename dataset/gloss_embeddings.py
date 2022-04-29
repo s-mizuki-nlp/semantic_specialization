@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 from typing import List, Dict, Any, Optional
-import io, copy
+import io, copy, random
 import pickle
 from collections import defaultdict
 from tqdm import tqdm
@@ -144,6 +144,14 @@ class SREFLemmaEmbeddingsDataset(Dataset):
             lst_records.append(self.__getitem__(idx))
         return lst_records
 
+    def get_single_record_by_lemma_key(self, lemma_key: str, random_choice: bool = False) -> Dict[str, Any]:
+        lst_records = self.get_records_by_lemma_key(lemma_key)
+        assert len(lst_records) > 0, f"lemma key not found: {lemma_key}"
+        if random_choice:
+            return random.choice(lst_records)
+        else:
+            return lst_records[0]
+
     def get_records_by_lemma_and_pos(self, lemma: str, pos: str) -> List[Dict[str, Any]]:
         lst_records = []
         for idx in self._index_by_lemma_and_pos[(lemma, pos)]:
@@ -158,7 +166,7 @@ class SREFLemmaEmbeddingsDataset(Dataset):
         return list(set(lst_lemmas))
 
     def get_lemma_keys_by_lemma_and_pos(self, lemma: str, pos: str):
-        return self._lemma_and_pos_to_lemma_keys[(lemma, pos)]
+        return copy.deepcopy(self._lemma_and_pos_to_lemma_keys[(lemma, pos)])
 
     def get_lemma_keys(self):
         return list(self._index_by_lemma_key.keys())
