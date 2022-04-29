@@ -30,16 +30,7 @@ def WSDTaskDataLoader(dataset: Union[WSDTaskDataset, BufferedShuffleDataset],
 
 
 cfg_task_dataset = {
-    "WSDEval": {
-        "has_ground_truth": True,
-        "return_level":"entity",
-        "record_entity_field_name":"entities",
-        "record_entity_span_field_name":"subword_spans",
-        "ground_truth_lemma_keys_field_name":"ground_truth_lemma_keys",
-        "copy_field_names_from_record_to_entity":["corpus_id","document_id","sentence_id","words"],
-        "return_entity_subwords_avg_vector":True
-    },
-    "WSDValidation": {
+    "WSD": {
         "has_ground_truth": True,
         "return_level":"entity",
         "record_entity_field_name":"entities",
