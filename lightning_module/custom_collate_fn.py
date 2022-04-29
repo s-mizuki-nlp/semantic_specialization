@@ -2,6 +2,7 @@
 # -*- coding:utf-8 -*-
 import warnings
 from typing import Optional, List, Dict, Any, Union
+import random, copy
 import torch
 import pydash
 from dataset import utils
@@ -83,9 +84,8 @@ class GlossContextSimilarityTaskEmbeddingsCollateFunction(object):
 
         Returns: Dict[str, torch.tensor]
             query: (n, n_dim), query embeddings
-            positive: (n, n_dim), positive entity embeddings
-            num_hard_negatives: (n,) or None, number of hard negative examples.
-            hard_negatives: (n, max(num_hard_negatives), n_dim) or None, hard negative entity embeddings.
+            targets: (n, max(num_targets), n_dim), target embeddings = all candidate sense (=lemma key) embeddings for the query word (=lemma&pos pair).
+            num_targets: (n,), number of target examples.
         """
 
         def _list_of(field_name: str, lst_records):
@@ -120,6 +120,83 @@ class GlossContextSimilarityTaskEmbeddingsCollateFunction(object):
             "query": t_query,
             "targets": t_targets,
             "num_targets": torch.LongTensor(lst_num_targets, device=self._device)
+        }
+
+        return dict_ret
+
+
+class GlossContextAlignmentTaskEmbeddingsCollateFunction(object):
+
+    def __init__(self,
+                 lemma_embeddings_dataset: Union[SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset],
+                 convert_adjective_to_adjective_satellite: bool = True,
+                 device: Optional[str] = "cpu"):
+
+        if not convert_adjective_to_adjective_satellite:
+            warnings.warn(f"We recommend you to enable convert_adjective_to_adjective_satellite unless otherwise specific reason.")
+
+        self._device = device
+        self._convert_adjective_to_adjective_satellite = convert_adjective_to_adjective_satellite
+        self._lemma_embeddings_dataset = lemma_embeddings_dataset
+
+    def __call__(self, lst_records: List[Dict[str, Any]]) -> Dict[str, Union[None, torch.Tensor]]:
+        """
+        Collate function for gloss-context alignment task. It requires pre-computed sense-annotated corpus e.g., SemCor.
+
+        Args:
+            lst_records: list of outputs from WSDTaskDataset.
+
+        Returns: Dict[str, torch.tensor]
+            query: (n, n_dim), query embeddings = entity embedding within the WSD task.
+            positive: (n, n_dim), ground-truth sense (=lemma key) embeddings.
+            negatives: (n, max(num_negatives), n_dim), incorrect sense (=lemma key) embeddings.
+            num_negatives: (n,), number of negative examples.
+        """
+
+        lst_t_queries = []
+        lst_t_positives = []
+        lst_t_negatives = []
+        lst_num_negatives = []
+        for record in lst_records:
+            lemma_name, pos = record["lemma"], record["pos"]
+            ground_truth_lemma_key = random.choice(record["ground_truth_lemma_keys"])
+            if self._convert_adjective_to_adjective_satellite:
+                pos = "s" if pos == "a" else pos
+
+            assert record["entity_sequence_length"] == record["entity_embedding"].shape[0]
+            # query
+            t_query = torch.mean(record["entity_embedding"], dim=0)
+            lst_t_queries.append(t_query)
+
+            # ground-truth = positive
+            record = self._lemma_embeddings_dataset.get_single_record_by_lemma_key(lemma_key=ground_truth_lemma_key, random_choice=True)
+            t_positive = torch.tensor(record["embeddings"])
+            lst_t_positives.append(t_positive)
+
+            # negatives
+            lst_negative_lemma_keys = self._lemma_embeddings_dataset.get_lemma_keys_by_lemma_and_pos(lemma=lemma_name, pos=pos)
+            ## remove ground-truth.
+            lst_negative_lemma_keys.remove(ground_truth_lemma_key)
+            num_negative = len(lst_negative_lemma_keys)
+            if num_negative == 0:
+                t_negatives = torch.zeros_like(t_query).reshape(1, -1)
+            else:
+                lst_negative_embeddings = [self._lemma_embeddings_dataset.get_single_record_by_lemma_key(lemma_key)["embeddings"] for lemma_key in lst_negative_lemma_keys]
+                t_negatives = torch.tensor(lst_negative_embeddings)
+            lst_t_negatives.append(t_negatives)
+
+            # number of negatives
+            lst_num_negatives.append(num_negative)
+
+        t_query = torch.stack(lst_t_queries, dim=0).to(self._device)
+        t_positives = torch.stack(lst_t_positives, dim=0).to(self._device)
+        t_negatives = utils.pad_and_stack_list_of_tensors(lst_t_negatives).to(self._device)
+
+        dict_ret = {
+            "query": t_query,
+            "positive": t_positives,
+            "negatives": t_negatives,
+            "num_negatives": torch.LongTensor(lst_num_negatives, device=self._device)
         }
 
         return dict_ret
