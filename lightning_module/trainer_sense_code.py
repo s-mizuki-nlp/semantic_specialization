@@ -16,9 +16,6 @@ from torch.optim import Adam
 from torch_optimizer import RAdam
 from pytorch_lightning import LightningModule
 
-from model import HierarchicalCodeEncoder
-from model.loss_supervised import HyponymyScoreLoss, EntailmentProbabilityLoss, CrossEntropyLossWrapper
-from model.encoder_internal import BaseLogitAdjustableLayer, BasePrefixAwareLayer
 from custom.optimizer import AdamWithWarmup
 
 class SenseCodeTrainer(LightningModule):

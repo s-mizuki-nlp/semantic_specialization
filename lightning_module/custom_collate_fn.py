@@ -83,8 +83,8 @@ class GlossContextSimilarityTaskEmbeddingsCollateFunction(object):
             lst_records: list of outputs from WSDTaskDataset.
 
         Returns: Dict[str, torch.tensor]
-            query: (n, n_dim), query embeddings
-            targets: (n, max(num_targets), n_dim), target embeddings = all candidate sense (=lemma key) embeddings for the query word (=lemma&pos pair).
+            query: (n, n_dim), query embeddings = in-context entity embeddings of a text.
+            targets: (n, max(num_targets), n_dim), all candidate sense (=lemma key) embeddings for the query word (=lemma&pos pair).
             num_targets: (n,), number of target examples.
         """
 
@@ -125,7 +125,7 @@ class GlossContextSimilarityTaskEmbeddingsCollateFunction(object):
         return dict_ret
 
 
-class GlossContextAlignmentTaskEmbeddingsCollateFunction(object):
+class SupervisedGlossContextAlignmentTaskEmbeddingsCollateFunction(object):
 
     def __init__(self,
                  lemma_embeddings_dataset: Union[SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset],
@@ -147,7 +147,7 @@ class GlossContextAlignmentTaskEmbeddingsCollateFunction(object):
             lst_records: list of outputs from WSDTaskDataset.
 
         Returns: Dict[str, torch.tensor]
-            query: (n, n_dim), query embeddings = entity embedding within the WSD task.
+            query: (n, n_dim), query embeddings = in-context entity embeddings of a sense-annotated text.
             positive: (n, n_dim), ground-truth sense (=lemma key) embeddings.
             negatives: (n, max(num_negatives), n_dim), incorrect sense (=lemma key) embeddings.
             num_negatives: (n,), number of negative examples.

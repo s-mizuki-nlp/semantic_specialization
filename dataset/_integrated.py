@@ -7,9 +7,7 @@ import torch
 import numpy as np
 
 from .contextualized_embeddings import BERTEmbeddingsDataset
-from .lexical_knowledge import LemmaDataset, SynsetDataset
 
-from torch.nn import functional as F
 from torch.utils.data import IterableDataset
 from .encoder import extract_entity_subword_embeddings, calc_entity_subwords_average_vectors, extract_entity_spans_from_record
 from . import utils
