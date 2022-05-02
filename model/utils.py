@@ -51,3 +51,14 @@ def pairwise_dot_similarity(tensor: torch.Tensor, reduction="none"):
 
     t_pairwise_dot = (t_norm_cols**2 + t_norm_rows**2 - t_pairwise_l2**2) / 2
     return _reduction(t_pairwise_dot, reduction)
+
+def batch_pairwise_cosine_similarity(tensors: torch.Tensor, num_samples: torch.LongTensor, reduction="none"):
+    losses = torch.zeros((len(num_samples),), dtype=torch.float, device=tensors.device)
+    for idx, (tensor, num_sample) in enumerate(zip(tensors, num_samples)):
+        if num_sample <= 1:
+            losses[idx] = 0.0
+        else:
+            loss = pairwise_cosine_similarity(tensor[:num_sample,:]).mean()
+            losses[idx] = loss
+
+    return _reduction(losses, reduction)
