@@ -6,12 +6,9 @@ from typing import Dict, Any, Optional, Union, List
 from torch.utils.data import DataLoader, BufferedShuffleDataset, ChainDataset
 
 from dataset import WSDTaskDataset, WSDTaskDatasetCollateFunction
-from dataset.lexical_knowledge import LemmaDataset, SynsetDataset
-from dataset.contextualized_embeddings import BERTEmbeddingsDataset
 
 USE_ENTITY_EMBEDDING = 0.0
 USE_SENTENCE_EMBEDDING = 1.0
-
 
 def WSDTaskDataLoader(dataset: Union[WSDTaskDataset, BufferedShuffleDataset],
                       batch_size: int,
@@ -45,8 +42,7 @@ cfg_task_dataset = {
         "record_entity_field_name":"monosemous_entities",
         "record_entity_span_field_name":"subword_spans",
         "copy_field_names_from_record_to_entity":None,
-        "return_entity_subwords_avg_vector":True,
-        "raise_error_on_unknown_lemma":True
+        "return_entity_subwords_avg_vector":True
     },
     "TrainOnWordNetGlossCorpus": {
         "has_ground_truth": True,
