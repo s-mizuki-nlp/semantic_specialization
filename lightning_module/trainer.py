@@ -12,21 +12,29 @@ import pickle
 import numpy as np
 import torch
 from torch import nn
+from torch.nn import functional as F
 from torch import optim
 from torch.optim import Adam
 from torch_optimizer import RAdam
 from pytorch_lightning import LightningModule
 
+from dataset import WSDTaskDataset
+from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset
+from evaluator.wsd_knn import FrozenBERTKNNWSDTaskEvaluator
+
 from model.loss import ContrastiveLoss
 from model.loss_unsupervised import MaxPoolingMarginLoss
+from model.utils import pairwise_cosine_similarity, batch_pairwise_cosine_similarity
 from custom.optimizer import AdamWithWarmup
 
-class FrozenBERTKKWSDTaskTrainer(LightningModule):
+class FrozenBERTWSDTaskTrainer(LightningModule):
 
     def __init__(self,
                  gloss_projection_head: nn.Module,
                  contrastive_loss: ContrastiveLoss,
                  optimizer_params: Dict[str, Any],
+                 wsd_evaluation_dataset: Optional[WSDTaskDataset] = None,
+                 wsd_evaluation_glosses: Optional[Union[SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset]] = None,
                  context_projection_head: Optional[torch.nn.Module] = None,
                  max_pool_margin_loss: Optional[MaxPoolingMarginLoss] = None,
                  coef_max_pool_margin_loss: float = 1.0,
@@ -37,6 +45,11 @@ class FrozenBERTKKWSDTaskTrainer(LightningModule):
                  ):
 
         super().__init__()
+
+        self._wsd_evaluation_dataset = wsd_evaluation_dataset
+        if wsd_evaluation_dataset is not None:
+            assert wsd_evaluation_glosses is not None, f"you must specify `wsd_evaluation_glosses`"
+        self._wsd_evaluation_glosses = wsd_evaluation_glosses
 
         self._contrastive_loss = contrastive_loss
 
@@ -73,9 +86,6 @@ class FrozenBERTKKWSDTaskTrainer(LightningModule):
         else:
             self._loss_parameter_schedulers = loss_parameter_schedulers
 
-    def _numpy_to_tensor(self, np_array: np.array):
-        return torch.from_numpy(np_array).to(self._device)
-
     def _get_model_device(self):
         return (next(self._gloss_projection_head.parameters())).device
 
@@ -99,25 +109,6 @@ class FrozenBERTKKWSDTaskTrainer(LightningModule):
             _optimizer_class = getattr(optim, self._optimizer_class_name)
             opt = _optimizer_class(params=self.parameters(), **self._optimizer_params)
         return opt
-
-    @property
-    def metrics(self) -> Dict[str, str]:
-        # ToDo: update validation metrics
-        map_metric_to_validation = {
-            "hp/contrastive_loss":"val_cond_cpl",
-            "hp/uniformity":"val_cross_entropy",
-            "hp/alignment":"val_cond_cpl_vs_gt_ratio",
-            "hp/gloss_context_similarity":"val_code_inclusion_probability"
-        }
-        return map_metric_to_validation
-
-    def on_train_start(self) -> None:
-        init_metrics = {metric_name:0 for metric_name in self.metrics.keys()}
-        self.logger.log_hyperparams(params=self.hparams, metrics=init_metrics)
-
-    def forward(self, batch):
-        t_codes, t_code_probs = self._gloss_projection_head.forward(x)
-        return t_codes, t_code_probs
 
     def on_save_checkpoint(self, checkpoint):
         device = self._get_model_device()
@@ -295,114 +286,88 @@ class FrozenBERTKKWSDTaskTrainer(LightningModule):
         self.log_dict(dict_losses)
         return loss
 
-    def evaluate_metrics(self, target_codes: torch.Tensor, conditional_code_probs: torch.Tensor, generated_codes: Optional[torch.Tensor] = None, eps: float = 1E-15):
-        """
+    def on_train_start(self) -> None:
+        init_metrics = {metric_name:0.0 for metric_name in self.metrics.keys()}
+        self.logger.log_hyperparams(params=self.hparams, metrics=init_metrics)
 
-        @param target_codes: (n_batch, n_digits). ground-truth sense codes.
-        @param conditional_code_probs: (n_batch, n_digits, n_ary). conditional probability. Pr(Y_d|y_{<d})
-        @param generated_codes: (n_batch, n_digits). generated sense code (using greedy decoding).
-        @param eps:
-        @return:
-        """
-        # one-hot encoding without smoothing
-        n_ary = self._gloss_projection_head.n_ary
-        t_code_probs_gt = self._aux_hyponymy_score._one_hot_encoding(t_codes=target_codes, n_ary=n_ary, label_smoothing_factor=0.0)
+    def validation_step(self, batch: Dict[str, Dict[str, torch.Tensor]], batch_idx: int):
 
-        # code lengths
-        t_code_length_gt = (target_codes != 0).sum(axis=-1).type(torch.float)
-        t_soft_code_length_pred = self._aux_hyponymy_score.calc_soft_code_length(conditional_code_probs)
+        # contrastive loss
+        _batch = batch["contrastive"]
+        contrastive_loss = self._forward_contrastive_task(projection_head=self._gloss_projection_head, loss_function=self._contrastive_loss, **_batch)
 
-        # common prefix lengths using conditional probability
-        t_cond_cpl = self._aux_hyponymy_score.calc_soft_lowest_common_ancestor_length(t_prob_c_x=t_code_probs_gt, t_prob_c_y=conditional_code_probs)
-        t_lca_vs_gt_ratio = t_cond_cpl / t_code_length_gt
-        t_pred_vs_gt_ratio = t_soft_code_length_pred / t_code_length_gt
+        # contrastive objective related metrics: alignment, uniformity
+        _query = self._gloss_projection_head.forward(_batch["query"])
+        _positive = self._gloss_projection_head.forward(_batch["positive"])
+        alignment = F.cosine_similarity(_query, _positive, dim=-1).mean()
+        uniformity = pairwise_cosine_similarity(_query, reduction="mean")
 
-        # common prefix lengths using generated codes
-        if generated_codes is not None:
-            if generated_codes.ndim == 3:
-                t_code_pred = generated_codes.argmax(dim=-1)
-            else:
-                t_code_pred = generated_codes
-            t_gen_cpl_batch = self._aux_hyponymy_score.calc_hard_common_ancestor_length(t_code_gt=target_codes, t_code_pred=t_code_pred)
-            t_gen_cpl = torch.mean(t_gen_cpl_batch)
+        # (optional) sup. alignment loss
+        if "supervised_alignment" not in batch:
+            supervised_alignment_loss = 0.0
+            gloss_context_similarity = 0.0
+            homograph_similarity = 0.0
         else:
-            t_gen_cpl = 0.0
+            _batch = batch["supervised_alignment"]
+            supervised_alignment_loss = self._forward_supervised_alignment_task(gloss_projection_head=self._gloss_projection_head, context_projection_head=self._context_projection_head,
+                                                                                # we use contrastive loss as an alternative.
+                                                                                loss_function=self._contrastive_loss,
+                                                                                **_batch)
+            _query = self._context_projection_head.forward(_batch["query"])
+            _positive = self._gloss_projection_head.forward(_batch["positive"])
+            _negatives = self._gloss_projection_head.forward(_batch["negatives"])
 
-        # entailment probability
-        t_prob_entail = self._aux_hyponymy_score.calc_ancestor_probability(t_prob_c_x=t_code_probs_gt, t_prob_c_y=conditional_code_probs)
-        t_prob_synonym = self._aux_hyponymy_score.calc_synonym_probability(t_prob_c_x=t_code_probs_gt, t_prob_c_y=conditional_code_probs)
-        t_prob_inclusion = t_prob_synonym + t_prob_entail
+            gloss_context_similarity = F.cosine_similarity(_query, _positive, dim=-1).mean()
 
-        # cross entropy
-        t_cross_entropy = self._aux_cross_entropy.forward(input_code_probabilities=conditional_code_probs, target_codes=target_codes)
-
-        # code diversity
-        code_probability_divergence = torch.mean(np.log(n_ary) + torch.sum(conditional_code_probs * torch.log(conditional_code_probs + eps), axis=-1), axis=-1)
-
-        metrics = {
-            "val_cross_entropy":t_cross_entropy,
-            "val_gen_cpl":t_gen_cpl,
-            "val_cond_cpl":torch.mean(t_cond_cpl),
-            "val_cond_cpl_vs_gt_ratio":torch.mean(t_lca_vs_gt_ratio),
-            "val_code_length_mean":torch.mean(t_soft_code_length_pred),
-            "val_code_inclusion_probability":torch.mean(t_prob_inclusion),
-            "val_code_length_std":torch.std(t_soft_code_length_pred),
-            "val_code_length_pred_vs_gt_ratio":torch.mean(t_pred_vs_gt_ratio),
-            "val_code_probability_divergence":torch.mean(code_probability_divergence)
-        }
-        return metrics
-
-    def validation_step(self, batch, batch_idx):
-
-        # forward computation without back-propagation
-        t_target_codes = batch["ground_truth_synset_codes"]
-        # conditional probability
-        _, t_code_probs = self._gloss_projection_head._predict(**batch)
-        # sense code generation and its probability
-        t_codes_greedy, t_code_probs_greedy = self._gloss_projection_head._encode(**batch)
-
-        # (required) supervised loss
-        loss_supervised = self._contrastive_loss.forward(target_codes=t_target_codes, input_code_probabilities=t_code_probs)
-
-        loss = loss_supervised
+            _homographs = torch.cat((_positive.unsqueeze(dim=1), _negatives), dim=1)
+            _num_homographs = _batch["num_negatives"] + 1
+            homograph_similarity = batch_pairwise_cosine_similarity(tensors=_homographs, num_samples=_num_homographs, reduction="mean")
 
         metrics = {
-            "val_loss": loss
+            "val_loss_contrastive": contrastive_loss,
+            "val_contrastive_alignment": alignment,
+            "val_contrastive_uniformity": uniformity,
+            "val_loss_supervised_alignment": supervised_alignment_loss,
+            "val_gloss_context_similarity": gloss_context_similarity,
+            "val_homograph_similarity": homograph_similarity
         }
-
-        # analysis metrics
-        ## based on continuous relaxation
-        metrics_repr = self.evaluate_metrics(target_codes=t_target_codes, conditional_code_probs=t_code_probs, generated_codes=t_codes_greedy)
-        metrics.update(metrics_repr)
-
         self.log_dict(metrics)
 
         # copy metrics to hyper parameters
         for metric_name, validation_metric_name in self.metrics.items():
-            self.log(metric_name, metrics_repr[validation_metric_name])
+            self.log(metric_name, metrics[validation_metric_name])
 
-        # return list of generated codes
-        lst_codes = []
-        for code in t_codes_greedy.tolist():
-            lst_codes.append("-".join(map(str, code)))
+        # return none
 
-        return {"generated_codes": lst_codes}
+    @property
+    def metrics(self) -> Dict[str, str]:
+        map_metric_to_validation = {
+            "hp/contrastive_loss": "val_loss_contrastive",
+            "hp/uniformity": "val_contrastive_uniformity",
+            "hp/alignment": "val_contrastive_alignment",
+            "hp/supervised_alignment": "val_loss_supervised_alignment",
+            "hp/gloss_context_similarity": "hp/val_gloss_context_similarity",
+            "hp/homograph_similarity": "val_homograph_similarity"
+        }
+        return map_metric_to_validation
 
-    def validation_epoch_end(self, validation_step_outputs) -> None:
-        set_codes = set()
-        n_code = 0
-        for output in validation_step_outputs:
-            lst_codes = output["generated_codes"]
-            n_code += len(lst_codes)
-            set_codes.update(lst_codes)
-        n_code_unique = len(set_codes)
-        self.log("val_unique_code_ratio", n_code_unique / n_code)
-        self.log("hp/unique_code_ratio", n_code_unique / n_code)
+    def training_epoch_end(self, outputs) -> None:
+        # Do evaluation using WSD dataset
+        if self._wsd_evaluation_dataset is None:
+            self.log("hp/wsd_eval", 0.0)
+            return
 
-    def test_step(self, batch, batch_idx):
-        # ToDo: call WSD evaluator
-        # self._evaluator
-        pass
+        evaluator = FrozenBERTKNNWSDTaskEvaluator(gloss_projection_head=self._gloss_projection_head,
+                                                  context_projection_head=self._context_projection_head,
+                                                  evaluation_dataset=self._wsd_evaluation_dataset,
+                                                  lemma_key_embeddings_dataset=self._wsd_evaluation_glosses,
+                                                  similarity_module="cosine",
+                                                  device=self._get_model_device())
+        dict_metrics = evaluator.evaluate()
 
-    def on_epoch_start(self):
-        pass
+        dict_logs = {}
+        dict_logs["hp/wsd_eval_ALL"] = dict_metrics["ALL"]
+        for pos, _metrics in dict_metrics["pos_orig"].items():
+            dict_logs[f"hp/wsd_eval_{pos}"] = _metrics["f1_score_by_raganato"]
+
+
