@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-import torch
 
+import torch
+from torch.nn.functional import pdist, normalize
 
 def masked_average(embeddings: torch.Tensor, sequence_mask: torch.BoolTensor, dim: int = -2):
     """
@@ -22,3 +23,31 @@ def masked_average(embeddings: torch.Tensor, sequence_mask: torch.BoolTensor, di
     t_mean = (embeddings * mask_rev).nansum(dim=dim) / (mask_rev.sum(dim=dim))
 
     return t_mean
+
+def _reduction(losses: torch.Tensor, reduction: str):
+    if reduction == "mean":
+        return torch.mean(losses)
+    elif reduction == "sum":
+        return torch.sum(losses)
+    elif reduction == "none":
+        return losses
+
+def pairwise_cosine_similarity(tensor: torch.Tensor, reduction="none"):
+    t_x = normalize(tensor, p=2.0, dim=-1)
+    t_pairwise_sims = 1.0 - pdist(t_x, p=2.0) / 2
+    return _reduction(t_pairwise_sims, reduction)
+
+def pairwise_dot_similarity(tensor: torch.Tensor, reduction="none"):
+    t_x = tensor
+    t_pairwise_l2 = torch.nn.functional.pdist(t_x)
+
+    n_ = t_x.shape[0]
+    t_norm = torch.linalg.norm(t_x, dim=-1)
+    t_norm_cross = torch.tile(t_norm, (n_, 1))
+
+    triu_index = [torch.triu_indices(n_, n_, offset=1)[0], torch.triu_indices(n_, n_, offset=1)[1]]
+    t_norm_cols = t_norm_cross.T[triu_index]
+    t_norm_rows = t_norm_cross[triu_index]
+
+    t_pairwise_dot = (t_norm_cols**2 + t_norm_rows**2 - t_pairwise_l2**2) / 2
+    return _reduction(t_pairwise_dot, reduction)
