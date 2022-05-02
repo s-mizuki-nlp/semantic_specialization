@@ -48,6 +48,11 @@ class SREFLemmaEmbeddingsDataset(Dataset):
         record = self._dataset[item]
         return record
 
+    @property
+    def n_dim(self):
+        record = self.__getitem__(0)
+        return record["embeddings"].shape[-1]
+
     @classmethod
     def load_basic_lemma_embeddings(cls, path: str, l2_norm: bool, return_first_embeddings_only: bool, force_ndim_to_2: bool = False) -> Dict[str, np.ndarray]:
         dict_lemma_key_embeddings = {}
@@ -180,6 +185,7 @@ class SREFLemmaEmbeddingsDataset(Dataset):
             "__len__": self.__len__(),
             "num_lemma_and_pos": len(self.get_lemma_and_pos()),
             "num_lemma_keys": len(self.get_lemma_keys()),
+            "n_dim": self.n_dim,
             "description":self._description
         }
         return ret
@@ -279,6 +285,7 @@ class BERTLemmaEmbeddingsDataset(SREFLemmaEmbeddingsDataset):
             "__len__": self.__len__(),
             "num_lemma_and_pos": len(self.get_lemma_and_pos()),
             "num_lemma_keys": len(self.get_lemma_keys()),
+            "n_dim": self.n_dim,
             "description":self._description,
         }
         return ret

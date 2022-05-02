@@ -31,11 +31,11 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
     def __init__(self,
                  gloss_projection_head: nn.Module,
+                 context_projection_head: torch.nn.Module,
                  contrastive_loss: ContrastiveLoss,
                  optimizer_params: Dict[str, Any],
                  wsd_evaluation_dataset: Optional[WSDTaskDataset] = None,
                  wsd_evaluation_glosses: Optional[Union[SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset]] = None,
-                 context_projection_head: Optional[torch.nn.Module] = None,
                  max_pool_margin_loss: Optional[MaxPoolingMarginLoss] = None,
                  coef_max_pool_margin_loss: float = 1.0,
                  supervised_alignment_loss: Optional[ContrastiveLoss] = None,
@@ -54,11 +54,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         self._contrastive_loss = contrastive_loss
 
         self._gloss_projection_head = gloss_projection_head
-        if context_projection_head is None:
-            warnings.warn(f"gloss_projection_head will be used as context_projection_head.")
-            self._context_projection_head = gloss_projection_head
-        else:
-            self._context_projection_head = context_projection_head
+        self._context_projection_head = context_projection_head
 
         # ToDo: implement hyper-parameter export feature on encoder when saving hyper-parameters are helpful.
         hparams = {}
