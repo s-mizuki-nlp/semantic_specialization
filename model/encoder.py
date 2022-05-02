@@ -13,7 +13,7 @@ from torch import nn
 class MultiLayerPerceptron(nn.Module):
 
     def __init__(self, n_dim_in, n_dim_out, n_dim_hidden, n_layer, activation_function = torch.relu,
-                 bias: bool = False):
+                 bias: bool = False, **kwargs):
         """
         multi-layer dense neural network with artibrary activation function
         output = Dense(iter(Activation(Dense())))(input)
@@ -58,7 +58,7 @@ class RestrictedShift(nn.Module):
 
     def __init__(self, n_dim_in, max_l2_norm: float,
                  n_dim_hidden, n_layer, activation_function = torch.relu,
-                 bias: bool = False):
+                 bias: bool = False, **kwargs):
         """
         this module shifts input vector up to max L2 norm.
         let x as input, d as number of dimensions, \sigma as sigmoid function, F(x) as the multi-layer perceptron, output will be written as follows.

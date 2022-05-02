@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
+from typing import Optional
 import torch
 from torch.nn.modules import loss as L, PairwiseDistance
 
+from .similarity import CosineSimilarity
 from .loss import _create_mask_tensor
 from .utils import pairwise_cosine_similarity, pairwise_dot_similarity, _reduction
 
@@ -60,11 +62,11 @@ class PairwiseSimilarityPreservationLoss(L._Loss):
 
 class MaxPoolingMarginLoss(L._Loss):
 
-    def __init__(self, similarity_module: torch.nn.Module,
-                 max_margin: float,
+    def __init__(self, similarity_module: Optional[torch.nn.Module] = None,
+                 max_margin: float = 0.7,
                  size_average=None, reduce=None, reduction: str = "mean"):
         super().__init__(size_average, reduce, reduction)
-        self._similarity = similarity_module
+        self._similarity = CosineSimilarity(temperature=1.0) if similarity_module is None else similarity_module
         self._max_margin = max_margin
         self._size_average = size_average
         self._reduce = reduce

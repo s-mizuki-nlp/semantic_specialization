@@ -13,7 +13,7 @@ class CosineSimilarity(nn.Module):
     Dot product or cosine similarity
     """
 
-    def __init__(self, temperature: float = 1.0):
+    def __init__(self, temperature: float = 0.1, **kwargs):
         super().__init__()
         self._temperature = temperature
         self._cosine = nn.CosineSimilarity(dim=-1)
@@ -27,7 +27,7 @@ class DotProductSimilarity(nn.Module):
     Dot product or cosine similarity
     """
 
-    def __init__(self, temperature: float = 1.0):
+    def __init__(self, temperature: float = 1.0, **kwargs):
         super().__init__()
         self._temperature = temperature
 
@@ -42,7 +42,7 @@ class ArcMarginProduct(nn.Module):
             margin: margin [Rad]
             return: cos(theta + margin)/temperature for hard example (`is_hard_examples=True`), cos(theta)/temperature otherwise
         """
-    def __init__(self, margin=0.50, temperature: float = 0.1, easy_margin=False):
+    def __init__(self, margin=0.50, temperature: float = 0.1, easy_margin=False, **kwargs):
         super().__init__()
         self._temperature = temperature
         self._margin = margin

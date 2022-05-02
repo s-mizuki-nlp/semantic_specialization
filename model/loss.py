@@ -28,7 +28,7 @@ def _create_mask_tensor(seq_lens: Union[np.ndarray, torch.LongTensor]):
 class ContrastiveLoss(L._Loss):
 
     def __init__(self, similarity_module: nn.Module,
-                 use_positives_as_in_batch_negatives: bool,
+                 use_positives_as_in_batch_negatives: bool = True,
                  size_average=None, reduce=None, reduction: str = "mean"):
         super(ContrastiveLoss, self).__init__(size_average, reduce, reduction)
         self._similarity = similarity_module
