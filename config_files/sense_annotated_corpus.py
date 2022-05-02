@@ -8,7 +8,7 @@ from __future__ import print_function
 import os
 from dataset.filter import EmptyFilter, DictionaryFilter
 _no_entity_sentence_filter = EmptyFilter(check_field_names=["entities"])
-_noun_verb_entity_selector = DictionaryFilter(includes={"pos":{"n","v"}})
+# _noun_verb_entity_selector = DictionaryFilter(includes={"pos":{"n","v"}})
 
 from .utils import pick_first_available_path
 
