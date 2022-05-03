@@ -6,6 +6,7 @@ from __future__ import division
 from __future__ import print_function
 
 
+import copy
 from abc import ABCMeta, abstractmethod
 from typing import Optional, Dict, Callable, Iterable, Any, List, Union, Set, Tuple
 from collections import defaultdict
@@ -208,7 +209,7 @@ class WSDTaskEvaluatorBase(BaseEvaluatorByRaganato, metaclass=ABCMeta):
         for single_example_batch in self._evaluation_data_loader:
             if is_wsd_task_dataset:
                 inputs_for_evaluator = single_example_batch["records"][0]
-                inputs_for_predictor = single_example_batch
+                inputs_for_predictor = copy.deepcopy(single_example_batch)
                 del inputs_for_predictor["records"]
                 inputs_for_predictor.update(inputs_for_evaluator)
             else:

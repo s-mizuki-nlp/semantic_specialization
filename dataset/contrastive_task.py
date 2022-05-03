@@ -37,9 +37,9 @@ class ContrastiveLearningDataset(Dataset):
         lst_valid_items = []
         for lemma_key_or_lemma_and_pos in lst_items:
             if self._iterate_over_lemma_or_lemma_key == "lemma_key":
-                record = self.get_contrastive_example(query_lemma_key=lemma_key_or_lemma_and_pos)
+                record = self.get_contrastive_example(query_lemma_key=lemma_key_or_lemma_and_pos, suppress_warning=True)
             elif self._iterate_over_lemma_or_lemma_key == "lemma":
-                record = self.get_contrastive_example(lemma=lemma_key_or_lemma_and_pos[0], pos=lemma_key_or_lemma_and_pos[1])
+                record = self.get_contrastive_example(lemma=lemma_key_or_lemma_and_pos[0], pos=lemma_key_or_lemma_and_pos[1], suppress_warning=True)
             if record is not None:
                 lst_valid_items.append(lemma_key_or_lemma_and_pos)
         return lst_valid_items
@@ -69,10 +69,11 @@ class ContrastiveLearningDataset(Dataset):
     def __getitem__(self, idx):
         if self._iterate_over_lemma_or_lemma_key == "lemma_key":
             lemma_key = self.items[idx]
-            record = self.get_contrastive_example(query_lemma_key=lemma_key, suppress_warning=True)
+            record = self.get_contrastive_example(query_lemma_key=lemma_key)
         else:
             lemma, pos = self.items[idx]
-            record = self.get_contrastive_example(lemma=lemma, pos=pos, suppress_warning=True)
+            record = self.get_contrastive_example(lemma=lemma, pos=pos)
+
         return record
 
     def get_contrastive_example(self, lemma: Optional[str] = None, pos: Optional[str] = None, query_lemma_key: Optional[str] = None, suppress_warning: bool = False):
@@ -90,9 +91,12 @@ class ContrastiveLearningDataset(Dataset):
         synset_id = utils_wordnet_gloss.lemma_key_to_synset_id(query_lemma_key)
 
         # positives = semantically related lemma keys of the query.
-        lst_positive_lemma_keys, lst_positive_weights = extract_lemma_keys_and_weights_from_semantically_related_synsets(synset_id=synset_id,
+        _lst_positive_lemma_keys, _lst_positive_weights = extract_lemma_keys_and_weights_from_semantically_related_synsets(synset_id=synset_id,
                                                                                                                          semantic_relation=self._semantic_relation_for_positives,
                                                                                                                          distinct=True, fix_synonym_distance=True)
+        # fix: make a copy in order to avoid update on lru_cache.
+        lst_positive_lemma_keys = _lst_positive_lemma_keys.copy()
+        lst_positive_weights = _lst_positive_weights.copy()
         if query_lemma_key in lst_positive_lemma_keys:
             idx = lst_positive_lemma_keys.index(query_lemma_key)
             del lst_positive_lemma_keys[idx]
