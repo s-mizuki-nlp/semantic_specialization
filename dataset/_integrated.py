@@ -190,9 +190,16 @@ class WSDTaskDataset(IterableDataset):
                 _ = record.pop(exclude_field, None)
             yield record
 
+    def __len__(self):
+        if hasattr(self, "_n_records"):
+            return self._n_records
+        else:
+            self._n_records = self.count_records()
+        return self._n_records
+
     def count_records(self):
         n_records = 0
-        for _ in self:
+        for _ in self.record_loader(return_level=self._return_level):
             n_records += 1
         return n_records
 
@@ -204,12 +211,15 @@ class WSDTaskDataset(IterableDataset):
     def has_ground_truth(self):
         return self._has_ground_truth
 
-    def record_loader(self):
+    def record_loader(self, return_level: str):
         self._bert_embeddings.return_record_only = True
 
         for obj_sentence in self._bert_embeddings:
-            for obj_entity in self._yield_entities_from_sentence(obj_sentence, include_embeddings=False):
-                yield obj_entity
+            if return_level == "entity":
+                for obj_entity in self._yield_entities_from_sentence(obj_sentence, include_embeddings=False):
+                    yield obj_entity
+            elif return_level == "sentence":
+                yield obj_sentence
 
         self._bert_embeddings.return_record_only = False
 
