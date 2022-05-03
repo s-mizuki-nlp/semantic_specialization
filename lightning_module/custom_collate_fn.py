@@ -12,6 +12,21 @@ from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset, BERTLemmaEmbedd
 
 
 def setup_data_loader(task_name, dataset, shuffle, device, batch_size, gloss_dataset = None, **kwargs):
+    """
+    ToDo: replace with LightningDataModule class.
+
+    Args:
+        task_name:
+        dataset:
+        shuffle:
+        device:
+        batch_size:
+        gloss_dataset:
+        **kwargs:
+
+    Returns:
+
+    """
     if task_name == "contrastive":
         _collate_fn = ContrastiveDatasetEmbeddingsCollateFunction(device=device)
     elif task_name == "max_pool_margin":
