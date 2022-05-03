@@ -39,8 +39,6 @@ class WSDTaskDataset(IterableDataset):
         self._weighted_average_entity_embeddings_and_sentence_embedding = weighted_average_entity_embeddings_and_sentence_embedding
         self._excludes = set() if excludes is None else excludes
 
-    @classmethod
-
     def _copy_fields(self, dict_source: Dict[str, Any], dict_target: Dict[str, Any],
                      copy_field_names: Optional[Iterable[str]] = None):
         if copy_field_names is None:
