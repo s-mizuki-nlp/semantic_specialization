@@ -249,7 +249,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
         # (optional) max-pool margin loss
         if self._max_pool_margin_loss is None:
-            max_pool_margin_loss = None
+            max_pool_margin_loss = 0.0
         else:
             task_name = "max_pool_margin"
             assert task_name in batch, f"you must specify '{task_name}' DataLoader."
@@ -259,7 +259,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
         # (optional) supervised alignment loss
         if self._supervised_alignment_loss is None:
-            supervised_alignment_loss = None
+            supervised_alignment_loss = 0.0
         else:
             task_name = "supervised_alignment"
             assert task_name in batch, f"you must specify '{task_name}' DataLoader."
@@ -267,11 +267,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                                                                                 loss_function=self._supervised_alignment_loss,
                                                                                 **batch[task_name])
 
-        loss = contrastive_loss
-        if max_pool_margin_loss is not None:
-            loss = loss + self._coef_max_pool_margin_loss * max_pool_margin_loss
-        if supervised_alignment_loss is not None:
-            loss = loss + self._coef_supervised_alignment_loss * supervised_alignment_loss
+        loss = contrastive_loss + self._coef_max_pool_margin_loss * max_pool_margin_loss + self._coef_supervised_alignment_loss * supervised_alignment_loss
 
         dict_losses = {
             "train_loss": loss,
@@ -342,7 +338,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
             "hp/uniformity": "val_contrastive_uniformity",
             "hp/alignment": "val_contrastive_alignment",
             "hp/supervised_alignment": "val_loss_supervised_alignment",
-            "hp/gloss_context_similarity": "hp/val_gloss_context_similarity",
+            "hp/gloss_context_similarity": "val_gloss_context_similarity",
             "hp/homograph_similarity": "val_homograph_similarity"
         }
         return map_metric_to_validation
@@ -361,9 +357,10 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                                                   device=self._get_model_device())
         dict_metrics = evaluator.evaluate()
 
-        dict_logs = {}
-        dict_logs["hp/wsd_eval_ALL"] = dict_metrics["ALL"]
+        dict_eval_metrics = {}
+        dict_eval_metrics["hp/wsd_eval_ALL"] = dict_metrics["ALL"]["f1_score_by_raganato"]
         for pos, _metrics in dict_metrics["pos_orig"].items():
-            dict_logs[f"hp/wsd_eval_{pos}"] = _metrics["f1_score_by_raganato"]
+            dict_eval_metrics[f"hp/wsd_eval_{pos}"] = _metrics["f1_score_by_raganato"]
+        self.log_dict(dict_eval_metrics, on_step=False, on_epoch=True)
 
 
