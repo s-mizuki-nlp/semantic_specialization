@@ -4,8 +4,10 @@
 from typing import Dict, Any, Optional, Union, List
 
 from torch.utils.data import DataLoader, BufferedShuffleDataset, ChainDataset
-
 from dataset import WSDTaskDataset, WSDTaskDatasetCollateFunction
+from dataset.filter import DictionaryFilter
+
+semeval_2007_filter = DictionaryFilter(includes={"corpus_id":{"semeval2007"}})
 
 USE_ENTITY_EMBEDDING = 0.0
 USE_SENTENCE_EMBEDDING = 1.0
@@ -26,6 +28,7 @@ def WSDTaskDataLoader(dataset: Union[WSDTaskDataset, BufferedShuffleDataset],
     return data_loader
 
 
+
 cfg_task_dataset = {
     "WSD": {
         "has_ground_truth": True,
@@ -35,6 +38,16 @@ cfg_task_dataset = {
         "ground_truth_lemma_keys_field_name":"ground_truth_lemma_keys",
         "copy_field_names_from_record_to_entity":["corpus_id","document_id","sentence_id","words"],
         "return_entity_subwords_avg_vector":True
+    },
+    "WSD-SemEval2007": {
+        "has_ground_truth": True,
+        "return_level":"entity",
+        "record_entity_field_name":"entities",
+        "record_entity_span_field_name":"subword_spans",
+        "ground_truth_lemma_keys_field_name":"ground_truth_lemma_keys",
+        "copy_field_names_from_record_to_entity":["corpus_id","document_id","sentence_id","words"],
+        "return_entity_subwords_avg_vector":True,
+        "filter_function": semeval_2007_filter
     },
     "TrainOnMonosemousCorpus": {
         "has_ground_truth": True,
