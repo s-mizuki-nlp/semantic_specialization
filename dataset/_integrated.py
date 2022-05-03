@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 import warnings
-from typing import Set, Optional, Dict, Any, Iterator, Union, List, Iterable
+from typing import Set, Optional, Dict, Any, Iterator, Union, List, Iterable, Callable
 
 import torch
 import numpy as np
@@ -25,7 +25,8 @@ class WSDTaskDataset(IterableDataset):
                  return_entity_subwords_avg_vector: bool = True,
                  weighted_average_entity_embeddings_and_sentence_embedding: float = 0.0,
                  normalize_embeddings: bool = False,
-                 excludes: Optional[Set[str]] = None):
+                 excludes: Optional[Set[str]] = None,
+                 filter_function: Optional[Union[Callable, List[Callable]]] = None):
 
         self._has_ground_truth = has_ground_truth
         self._bert_embeddings = bert_embeddings_dataset
@@ -38,6 +39,13 @@ class WSDTaskDataset(IterableDataset):
         self._normalize_embeddings = normalize_embeddings
         self._weighted_average_entity_embeddings_and_sentence_embedding = weighted_average_entity_embeddings_and_sentence_embedding
         self._excludes = set() if excludes is None else excludes
+
+        if filter_function is None:
+            self._filter_function = []
+        elif isinstance(filter_function, list):
+            self._filter_function = filter_function
+        elif not isinstance(filter_function, list):
+            self._filter_function = [filter_function]
 
     def _copy_fields(self, dict_source: Dict[str, Any], dict_target: Dict[str, Any],
                      copy_field_names: Optional[Iterable[str]] = None):
@@ -186,6 +194,8 @@ class WSDTaskDataset(IterableDataset):
         else:
             raise ValueError(f"unknown `return_level` value: {self._return_level}")
         for record in it_records:
+            if self._filter(record) == True:
+                continue
             for exclude_field in self._excludes:
                 _ = record.pop(exclude_field, None)
             yield record
@@ -196,6 +206,12 @@ class WSDTaskDataset(IterableDataset):
         else:
             self._n_records = self.count_records()
         return self._n_records
+
+    def _filter(self, entry: Dict[str, Any]):
+        for filter_function in self._filter_function:
+            if filter_function(entry) == True:
+                return True
+        return False
 
     def count_records(self):
         n_records = 0
@@ -217,8 +233,13 @@ class WSDTaskDataset(IterableDataset):
         for obj_sentence in self._bert_embeddings:
             if return_level == "entity":
                 for obj_entity in self._yield_entities_from_sentence(obj_sentence, include_embeddings=False):
+                    if self._filter(obj_entity) == True:
+                        continue
                     yield obj_entity
+
             elif return_level == "sentence":
+                if self._filter(obj_entity) == True:
+                        continue
                 yield obj_sentence
 
         self._bert_embeddings.return_record_only = False
