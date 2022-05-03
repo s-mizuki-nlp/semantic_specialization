@@ -6,8 +6,33 @@ import random, copy
 import torch
 import pydash
 from dataset import utils
+from torch.utils.data import Dataset, IterableDataset, BufferedShuffleDataset, DataLoader
 
 from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset
+
+
+def setup_data_loader(task_name, dataset, shuffle, device, batch_size, gloss_dataset = None, **kwargs):
+    if task_name == "contrastive":
+        _collate_fn = ContrastiveDatasetEmbeddingsCollateFunction(device=device)
+    elif task_name == "max_pool_margin":
+        _collate_fn = GlossContextSimilarityTaskEmbeddingsCollateFunction(lemma_embeddings_dataset=gloss_dataset,
+                                                                                           convert_adjective_to_adjective_satellite=True,
+                                                                                           device=device)
+    elif task_name == "supervised_alignment":
+        _collate_fn = SupervisedGlossContextAlignmentTaskEmbeddingsCollateFunction(lemma_embeddings_dataset=gloss_dataset,
+                                                                                                    convert_adjective_to_adjective_satellite=True,
+                                                                                                    device=device)
+    else:
+        raise ValueError(f"unknown task name: {task_name}")
+
+    if shuffle:
+        if isinstance(dataset, IterableDataset):
+            dataset = BufferedShuffleDataset(dataset, buffer_size=batch_size*16)
+            shuffle = False
+    data_loader = DataLoader(dataset, collate_fn=_collate_fn, batch_size=batch_size, shuffle=shuffle, **kwargs)
+
+    return data_loader
+
 
 class ContrastiveDatasetEmbeddingsCollateFunction(object):
 
