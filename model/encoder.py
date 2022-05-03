@@ -92,7 +92,7 @@ class RestrictedShift(nn.Module):
 
 class Identity(nn.Module):
 
-    def __init__(self, **kwargs):
+    def __init__(self, assign_dummy_parameter: bool = False, **kwargs):
         """
         multi-layer dense neural network with artibrary activation function
         output = Dense(iter(Activation(Dense())))(input)
@@ -104,6 +104,8 @@ class Identity(nn.Module):
         :param activation_function: activation function. e.g. torch.relu
         """
         super().__init__()
+        if assign_dummy_parameter:
+            self.dummy = nn.Parameter(torch.zeros((1,)), requires_grad=False)
 
     def forward(self, x):
         return x

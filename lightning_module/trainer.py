@@ -363,4 +363,18 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
             dict_eval_metrics[f"hp/wsd_eval_{pos}"] = _metrics["f1_score_by_raganato"]
         self.log_dict(dict_eval_metrics, on_step=False, on_epoch=True)
 
-
+    def optimizer_step(
+        self,
+        epoch: int = None,
+        batch_idx: int = None,
+        optimizer = None,
+        optimizer_idx: int = None,
+        optimizer_closure: Optional[Callable] = None,
+        on_tpu: bool = None,
+        using_native_amp: bool = None,
+        using_lbfgs: bool = None,
+    ) -> None:
+        if self._gloss_projection_head.__class__.__name__ == self._context_projection_head.__class__.__name__ == "Identity":
+            return
+        else:
+            super().optimizer_step(epoch, batch_idx, optimizer, optimizer_idx, optimizer_closure, on_tpu, using_native_amp, using_lbfgs)
