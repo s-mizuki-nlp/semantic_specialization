@@ -100,7 +100,7 @@ class ContrastiveLearningDataset(Dataset):
 
         # sanity check
         if len(lst_positive_lemma_keys) == 0:
-            if not suppress_warning:
+            if suppress_warning == False:
                 warnings.warn(f"no semantically related lemma: {lemma}|{pos}::{query_lemma_key}")
             return None
 
