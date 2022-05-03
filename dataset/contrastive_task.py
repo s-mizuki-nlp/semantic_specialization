@@ -7,19 +7,18 @@ import warnings
 
 import numpy as np
 
-from torch.utils.data import IterableDataset
+from torch.utils.data import Dataset
 from dataset_preprocessor import utils_wordnet_gloss
 from .gloss_embeddings import SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset
 from .gloss import WordNetGlossDataset
 from .sense_expansion import extract_lemma_keys_and_weights_from_semantically_related_synsets
 
-class ContrastiveLearningDataset(IterableDataset):
+class ContrastiveLearningDataset(Dataset):
 
     def __init__(self, gloss_dataset: Union[SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset, WordNetGlossDataset],
                  iterate_over_lemma_or_lemma_key: str = "lemma_key",
                  semantic_relation_for_positives: str = "all-relations",
                  use_taxonomy_distance_for_sampling_positives: bool = True,
-                 shuffle: bool = True,
                  num_hard_negatives: int = 0):
         """
 
@@ -33,45 +32,50 @@ class ContrastiveLearningDataset(IterableDataset):
         self._semantic_relation_for_positives = semantic_relation_for_positives
         self._use_taxonomy_distance_for_sampling_positives = use_taxonomy_distance_for_sampling_positives
         self._iterate_over_lemma_or_lemma_key = iterate_over_lemma_or_lemma_key
-        self._shuffle = shuffle
+
+    def clean_up_invalid_items(self, lst_items):
+        lst_valid_items = []
+        for lemma_key_or_lemma_and_pos in lst_items:
+            if self._iterate_over_lemma_or_lemma_key == "lemma_key":
+                record = self.get_contrastive_example(query_lemma_key=lemma_key_or_lemma_and_pos)
+            elif self._iterate_over_lemma_or_lemma_key == "lemma":
+                record = self.get_contrastive_example(lemma=lemma_key_or_lemma_and_pos[0], pos=lemma_key_or_lemma_and_pos[1])
+            if record is not None:
+                lst_valid_items.append(lemma_key_or_lemma_and_pos)
+        return lst_valid_items
+
+    @property
+    def items(self):
+        if hasattr(self, "_items"):
+            return self._items
+        else:
+            if self._iterate_over_lemma_or_lemma_key == "lemma_key":
+                lst_items = self._gloss_dataset.get_lemma_keys()
+            elif self._iterate_over_lemma_or_lemma_key == "lemma":
+                lst_items = self._gloss_dataset.get_lemma_and_pos()
+
+            # clean un invalid (=do not have semantically related) items
+            self._items = self.clean_up_invalid_items(lst_items)
+
+        return self._items
 
     def __len__(self):
-        if self._iterate_over_lemma_or_lemma_key == "lemma_key":
-            return len(self._gloss_dataset.get_lemma_keys())
-        elif self._iterate_over_lemma_or_lemma_key == "lemma":
-            return len(self._gloss_dataset.get_lemma_and_pos())
-
-    def iter_by_lemma_keys(self, shuffle: bool = True):
-        """
-        iterate over all lemma keys once.
-        """
-        lst_lemma_keys = self._gloss_dataset.get_lemma_keys()
-        if shuffle:
-            random.shuffle(lst_lemma_keys)
-
-        for lemma_key in lst_lemma_keys:
-            record = self.get_contrastive_example(query_lemma_key=lemma_key)
-            if record is not None:
-                yield record
-
-    def iter_by_lemma_and_pos(self, shuffle: bool = True):
-        lst_tup_lemma_and_pos = self._gloss_dataset.get_lemma_and_pos()
-        if shuffle:
-            random.shuffle(lst_tup_lemma_and_pos)
-
-        for lemma, pos in lst_tup_lemma_and_pos:
-            record = self.get_contrastive_example(lemma, pos)
-            if record is not None:
-                yield record
+        return len(self.items)
 
     def __iter__(self):
+        for idx in range(self.__len__()):
+            yield self.__getitem__(idx)
+
+    def __getitem__(self, idx):
         if self._iterate_over_lemma_or_lemma_key == "lemma_key":
-            return self.iter_by_lemma_keys(shuffle=self._shuffle)
-        elif self._iterate_over_lemma_or_lemma_key == "lemma":
-            return self.iter_by_lemma_and_pos(shuffle=self._shuffle)
+            lemma_key = self.items[idx]
+            record = self.get_contrastive_example(query_lemma_key=lemma_key, suppress_warning=True)
+        else:
+            lemma, pos = self.items[idx]
+            record = self.get_contrastive_example(lemma=lemma, pos=pos, suppress_warning=True)
+        return record
 
-    def get_contrastive_example(self, lemma: Optional[str] = None, pos: Optional[str] = None, query_lemma_key: Optional[str] = None):
-
+    def get_contrastive_example(self, lemma: Optional[str] = None, pos: Optional[str] = None, query_lemma_key: Optional[str] = None, suppress_warning: bool = False):
         # query
         if query_lemma_key is None:
             lst_lemma_keys = self._gloss_dataset.get_lemma_keys_by_lemma_and_pos(lemma, pos)
@@ -96,7 +100,8 @@ class ContrastiveLearningDataset(IterableDataset):
 
         # sanity check
         if len(lst_positive_lemma_keys) == 0:
-            warnings.warn(f"no semantically related lemma: {lemma}|{pos}::{query_lemma_key}")
+            if not suppress_warning:
+                warnings.warn(f"no semantically related lemma: {lemma}|{pos}::{query_lemma_key}")
             return None
 
         if self._use_taxonomy_distance_for_sampling_positives:
