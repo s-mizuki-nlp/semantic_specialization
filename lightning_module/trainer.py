@@ -335,9 +335,9 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
     def metrics(self) -> Dict[str, str]:
         map_metric_to_validation = {
             "hp/contrastive_loss": "val_loss_contrastive",
-            "hp/uniformity": "val_contrastive_uniformity",
-            "hp/alignment": "val_contrastive_alignment",
-            "hp/supervised_alignment": "val_loss_supervised_alignment",
+            "hp/contrastive_uniformity": "val_contrastive_uniformity",
+            "hp/contrastive_alignment": "val_contrastive_alignment",
+            "hp/supervised_alignment_loss": "val_loss_supervised_alignment",
             "hp/gloss_context_similarity": "val_gloss_context_similarity",
             "hp/homograph_similarity": "val_homograph_similarity"
         }

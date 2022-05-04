@@ -95,7 +95,7 @@ class ContrastiveDatasetEmbeddingsCollateFunction(object):
         dict_ret = {
             "query": torch.tensor(lst_queries, device=self._device),
             "positive": torch.tensor(lst_positives, device=self._device),
-            "num_hard_negatives": torch.LongTensor(lst_num_hard_negatives, device=self._device) if is_hard_negative_exists else None,
+            "num_hard_negatives": torch.tensor(lst_num_hard_negatives, device=self._device, dtype=torch.long) if is_hard_negative_exists else None,
             "hard_negatives": t_hard_negatives
         }
 
@@ -159,7 +159,7 @@ class GlossContextSimilarityTaskEmbeddingsCollateFunction(object):
         dict_ret = {
             "query": t_query,
             "targets": t_targets,
-            "num_targets": torch.LongTensor(lst_num_targets, device=self._device)
+            "num_targets": torch.tensor(lst_num_targets, device=self._device, dtype=torch.long)
         }
 
         return dict_ret
@@ -236,7 +236,7 @@ class SupervisedGlossContextAlignmentTaskEmbeddingsCollateFunction(object):
             "query": t_query,
             "positive": t_positives,
             "negatives": t_negatives,
-            "num_negatives": torch.LongTensor(lst_num_negatives, device=self._device)
+            "num_negatives": torch.tensor(lst_num_negatives, device=self._device, dtype=torch.long)
         }
 
         return dict_ret
