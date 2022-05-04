@@ -53,16 +53,16 @@ cfg_embeddings = {
         "lemma_surface_form_lowercase": False,
         "description": "Basic lemma embeddings used in SREF[Wang and Wang, EMNLP2020]. This embeddings are computed without using augmented example sentences."
     },
-    "SREF_Sense_Corpus-ANY-bert-large-cased": {
+    "SREF_Sense_Corpus-AVG-bert-large-cased": {
         "kwargs_bert_embeddings_dataset": cfg_training["SREF_Sense_Corpus-bert-large-cased"],
-        # "pooling_method": None,
+        "pooling_method": "average",
         "l2_norm": False,
         "use_first_embeddings_only": True,
         "description": "SREF Extended WordNet Gloss sentence embeddings."
     },
-    "WordNet_Gloss_Corpus-ANY-bert-large-cased": {
+    "WordNet_Gloss_Corpus-AVG-bert-large-cased": {
         "kwargs_bert_embeddings_dataset": cfg_training["WordNet_Gloss_Corpus-bert-large-cased"],
-        # "pooling_method": None,
+        "pooling_method": "average",
         "l2_norm": False,
         "use_first_embeddings_only": True,
         "description": "WordNet Gloss sentence embeddings."

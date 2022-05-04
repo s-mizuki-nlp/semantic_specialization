@@ -19,7 +19,7 @@ DIR_TRAINSET_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation
 DIR_WORDNET_GLOSS = "/home/sakae/Windows/dataset/word_sense_disambiguation/wordnet_gloss_corpus/"
 DIR_WORDNET_GLOSS_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/wordnet_gloss_corpus/bert_embeddings/"
 DIR_EXT_WORDNET_GLOSS = "/home/sakae/Windows/dataset/word_sense_disambiguation/wordnet_gloss_augmentation/"
-DIR_TRAIN_UNSUPERVISED_LOCAL = "/tmp/sakae/"
+DIR_LOCAL = "/tmp/sakae/"
 
 # evaluation dataset for all-words WSD task
 cfg_evaluation = {
@@ -37,7 +37,7 @@ cfg_evaluation = {
         "description": "WSD Evaluation Framework dataset [Raganato+, 2017]: Concatenates both before and after two sentences in the same document. ALL PoS tags.",
     },
     "WSDEval-ALL-bert-large-cased": {
-        "path":os.path.join(DIR_EVALSET_EMBEDDINGS, "bert-large-cased_wsdeval-all.hdf5"),
+        "path": os.path.join(DIR_EVALSET_EMBEDDINGS, "bert-large-cased_wsdeval-all.hdf5"),
         "padding": False,
         "max_sequence_length": None,
         "filter_function":None,
@@ -68,14 +68,17 @@ cfg_training = {
         "description": "WSD SemCor corpora, excluding no-sense-annotated sentences.",
     },
     "SemCor-bert-large-cased": {
-        "path":os.path.join(DIR_TRAINSET_EMBEDDINGS, "bert-large-cased_SemCor.hdf5"),
+        "path": pick_first_available_path(
+            os.path.join(DIR_LOCAL, "bert-large-cased_SemCor.hdf5"),
+            os.path.join(DIR_TRAINSET_EMBEDDINGS, "bert-large-cased_SemCor.hdf5")
+        ),
         "padding": False,
         "max_sequence_length": None,
         "description": "WSD SemCor corpora (excluding no-sense-annotated sentences) encoded by BERT-large-cased."
     },
     "WordNet_Gloss_Corpus-bert-large-cased": {
         "path": pick_first_available_path(
-            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_WordNet_Gloss_Corpus.hdf5"),
+            os.path.join(DIR_LOCAL, "bert-large-cased_WordNet_Gloss_Corpus.hdf5"),
             os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_WordNet_Gloss_Corpus.hdf5")
         ),
         "padding": False,
@@ -84,7 +87,7 @@ cfg_training = {
     },
     "SREF_Sense_Corpus-bert-large-cased": {
         "path": pick_first_available_path(
-            os.path.join(DIR_TRAIN_UNSUPERVISED_LOCAL, "bert-large-cased_SREF_Sense_Corpus.hdf5"),
+            os.path.join(DIR_LOCAL, "bert-large-cased_SREF_Sense_Corpus.hdf5"),
             os.path.join(DIR_WORDNET_GLOSS_EMBEDDINGS, "bert-large-cased_SREF_Sense_Corpus.hdf5")
         ),
         "padding": False,
