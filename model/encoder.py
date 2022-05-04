@@ -104,7 +104,7 @@ class NormRestrictedShift(nn.Module):
             epsilon = self._max_l2_norm_value / np.sqrt(self._ffn._n_dim_in)
         elif self._max_l2_norm_ratio is not None:
             # epsilon: (n,*,1)
-            epsilon = self._max_l2_norm_ratio * torch.linalg.norm(x, ord="fro", dim=-1, keepdim=True)
+            epsilon = self._max_l2_norm_ratio * torch.linalg.norm(x, ord=2, dim=-1, keepdim=True)
 
         y = x + epsilon * dx
 
