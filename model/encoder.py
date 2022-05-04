@@ -12,20 +12,28 @@ from torch import nn
 
 class MultiLayerPerceptron(nn.Module):
 
-    def __init__(self, n_dim_in, n_dim_out, n_dim_hidden, n_layer, activation_function = torch.relu,
+    def __init__(self, n_dim_in: int,
+                 n_dim_out: Optional[int] = None,
+                 n_dim_hidden: Optional[int] = None,
+                 n_layer: Optional[int] = 2,
+                 activation_function = torch.relu,
                  bias: bool = False, **kwargs):
         """
         multi-layer dense neural network with artibrary activation function
         output = Dense(iter(Activation(Dense())))(input)
 
         :param n_dim_in: input dimension size
-        :param n_dim_out: output dimension size
-        :param n_dim_hidden: hidden layer dimension size
-        :param n_layer: number of layers
+        :param n_dim_out: output dimension size. DEFAULT: n_dim_in
+        :param n_dim_hidden: hidden layer dimension size. DEFAULT: n_dim_in
+        :param n_layer: number of layers. DEFAULT: 2
         :param activation_function: activation function. e.g. torch.relu
         """
         super().__init__()
 
+        n_dim_out = n_dim_in if n_dim_out is None else n_dim_out
+        n_dim_hidden = n_dim_in if n_dim_hidden is None else n_dim_hidden
+
+        self._n_dim_in = n_dim_in
         self._n_hidden = n_layer
         self._n_dim_out = n_dim_out
         self._bias = bias
@@ -53,11 +61,18 @@ class MultiLayerPerceptron(nn.Module):
         with torch.no_grad():
             return self.forward(x)
 
+    def verbose(self):
+        return {}
 
-class RestrictedShift(nn.Module):
 
-    def __init__(self, n_dim_in, max_l2_norm: float,
-                 n_dim_hidden, n_layer, activation_function = torch.relu,
+class NormRestrictedShift(nn.Module):
+
+    def __init__(self, n_dim_in: int,
+                 n_layer: Optional[int] = 2,
+                 n_dim_hidden: Optional[int] = None,
+                 activation_function = torch.relu,
+                 max_l2_norm_value: Optional[float] = None,
+                 max_l2_norm_ratio: Optional[float] = None,
                  bias: bool = False, **kwargs):
         """
         this module shifts input vector up to max L2 norm.
@@ -65,23 +80,33 @@ class RestrictedShift(nn.Module):
         output = x + \epsilon (2 \sigma(F(x)) - 1); \epsilon = max_l2_norm / \sqr{d}
 
         :param n_dim_in: input dimension size
-        :param max_l2_norm: maximum L2 norm of shift vector.
+        :param max_l2_norm_value: maximum absolute L2 norm value of shift vector.
+        :param max_l2_norm_ratio: maximum relative L2 norm value of shift vector relative to input vector.
         :param n_dim_hidden: MLP hidden layer dimension size
         :param n_layer: MLP number of layers
         :param activation_function: MLP activation function. e.g. torch.relu
         """
         super().__init__()
 
+        assert (max_l2_norm_value is not None) or (max_l2_norm_ratio is not None), f"either `max_l2_norm_value` or `max_l2_norm_ratio` must be specified."
+        assert (max_l2_norm_value is None) or (max_l2_norm_ratio is None), f"you can't specify both `max_l2_norm_value` and `max_l2_norm_ratio` simultaneously."
+
         self._ffn = MultiLayerPerceptron(n_dim_in=n_dim_in, n_dim_out=n_dim_in, n_dim_hidden=n_dim_hidden, n_layer=n_layer, activation_function=activation_function, bias=bias)
-        self._max_l2_norm = max_l2_norm
-        self._n_dim = n_dim_in
-        self._epsilon = max_l2_norm / np.sqrt(n_dim_in)
+        self._max_l2_norm_value = max_l2_norm_value
+        self._max_l2_norm_ratio = max_l2_norm_ratio
 
     def forward(self, x):
         z = self._ffn.forward(x)
         # transform to [-1, 1]
         dx = 2. * torch.sigmoid(z) - 1.
-        y = x + self._epsilon * dx
+        if self._max_l2_norm_value is not None:
+            # epsilon: (1,)
+            epsilon = self._max_l2_norm_value / np.sqrt(self._ffn._n_dim_in)
+        elif self._max_l2_norm_ratio is not None:
+            # epsilon: (n,*,1)
+            epsilon = self._max_l2_norm_ratio * torch.linalg.norm(x, ord="fro", dim=-1, keepdim=True)
+
+        y = x + epsilon * dx
 
         return y
 
