@@ -189,9 +189,9 @@ def main():
 
     args = _parse_args()
     pprint(vars(args), compact=True)
-    quit()
 
     ## Evaluation/Development Dataset
+    print("loading evaluation dataset...")
     evalset_embeddings_name = args.eval_dataset_name
     evalset_embeddings = BERTEmbeddingsDataset(**sense_annotated_corpus.cfg_evaluation[evalset_embeddings_name])
 
@@ -280,8 +280,9 @@ def main():
     else:
         _cfg = args.cfg_max_pool_margin_loss
         if "similarity_module" not in _cfg:
-            _cfg["similarity_module"] = similarity_module
-        max_pool_margin_loss = MaxPoolingMarginLoss(**_cfg)
+            max_pool_margin_loss = MaxPoolingMarginLoss(**_cfg, similarity_module=similarity_module)
+        else:
+            max_pool_margin_loss = MaxPoolingMarginLoss(**_cfg)
 
     ### (optional) Supervised Gloss-Context Alignment loss
     if supervised_alignment_dataset is None:
@@ -351,23 +352,25 @@ def main():
                                      supervised_alignment_loss=supervised_alignment_loss,
                                      coef_supervised_alignment_loss=args.coef_supervised_alignment_loss,
                                      model_parameter_schedulers=None,
-                                     loss_parameter_schedulers=None)
+                                     loss_parameter_schedulers=None,
+                                     hparams=vars(args))
 
     logger = pl_loggers.TensorBoardLogger(save_dir=DEFAULT_SAVE_DIR, name=ENV_NAME, version=args.version, default_hp_metric=False)
     checkpoint_callback = ModelCheckpoint(filename="{epoch}", save_last=True)
 
-    system = pl.Trainer(logger = logger, callbacks=[checkpoint_callback],
+    system = pl.Trainer(logger=logger, callbacks=[checkpoint_callback],
                         val_check_interval=args.val_check_interval,
                         log_every_n_steps=args.log_every_n_steps,
                         flush_logs_every_n_steps=args.log_every_n_steps,
                         max_epochs=args.max_epochs,
-                        multiple_trainloader_mode="max_size_cycle",
                         gpus=args.gpus,
                         **args.cfg_trainer
                        )
     print(f"checkpoint will be saved: {logger.log_dir}")
 
-    system.fit(model, train_dataloaders=train_data_loaders, val_dataloaders=CombinedLoader(val_data_loaders, mode="max_size_cycle"))
+    system.fit(model,
+               train_dataloaders=CombinedLoader(train_data_loaders, mode="max_size_cycle"),
+               val_dataloaders=CombinedLoader(val_data_loaders, mode="max_size_cycle"))
 
     print(f"finished: {ENV_NAME}/version_{args.version}")
 

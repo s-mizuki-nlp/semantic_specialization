@@ -42,6 +42,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                  coef_supervised_alignment_loss: float = 1.0,
                  model_parameter_schedulers: Optional[Dict[str, Callable[[float], float]]] = None,
                  loss_parameter_schedulers: Optional[Dict[str, Callable[[float], float]]] = None,
+                 hparams: Optional[Dict[str, Any]] = None
                  ):
 
         super().__init__()
@@ -57,7 +58,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         self._context_projection_head = context_projection_head
 
         # ToDo: implement hyper-parameter export feature on encoder when saving hyper-parameters are helpful.
-        hparams = {}
+        hparams = {} if hparams is None else hparams
         self.save_hyperparameters(hparams)
 
         # set loss functions
