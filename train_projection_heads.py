@@ -80,6 +80,7 @@ def _default_configs():
     dict_default_projection_head = {
         "n_layer": 2,
         "max_l2_norm_ratio": 0.5,
+        "init_zeroes": True
     }
 
     dict_defaults = {

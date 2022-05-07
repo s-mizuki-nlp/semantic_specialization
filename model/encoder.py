@@ -17,7 +17,9 @@ class MultiLayerPerceptron(nn.Module):
                  n_dim_hidden: Optional[int] = None,
                  n_layer: Optional[int] = 2,
                  activation_function = torch.relu,
-                 bias: bool = False, **kwargs):
+                 bias: bool = False,
+                 init_zeroes: bool = False,
+                 **kwargs):
         """
         multi-layer dense neural network with artibrary activation function
         output = Dense(iter(Activation(Dense())))(input)
@@ -41,7 +43,10 @@ class MultiLayerPerceptron(nn.Module):
         for k in range(n_layer):
             n_in = n_dim_in if k==0 else n_dim_hidden
             n_out = n_dim_out if k==(n_layer - 1) else n_dim_hidden
-            self._lst_dense.append(nn.Linear(n_in, n_out, bias=bias))
+            dense_layer = nn.Linear(n_in, n_out, bias=bias)
+            if init_zeroes:
+                nn.init.uniform_(dense_layer.weight, -1/math.sqrt(n_in*1000), 1/math.sqrt(n_in*1000))
+            self._lst_dense.append(dense_layer)
         self._activation = activation_function
         self._layers = nn.ModuleList(self._lst_dense)
 
@@ -73,6 +78,7 @@ class NormRestrictedShift(nn.Module):
                  activation_function = torch.relu,
                  max_l2_norm_value: Optional[float] = None,
                  max_l2_norm_ratio: Optional[float] = None,
+                 init_zeroes: bool = False,
                  bias: bool = False, **kwargs):
         """
         this module shifts input vector up to max L2 norm.
@@ -85,13 +91,14 @@ class NormRestrictedShift(nn.Module):
         :param n_dim_hidden: MLP hidden layer dimension size
         :param n_layer: MLP number of layers
         :param activation_function: MLP activation function. e.g. torch.relu
+        :param init_zeroes: initialize MLP with very small values. i.e., initial shift will be almost zero.
         """
         super().__init__()
 
         assert (max_l2_norm_value is not None) or (max_l2_norm_ratio is not None), f"either `max_l2_norm_value` or `max_l2_norm_ratio` must be specified."
         assert (max_l2_norm_value is None) or (max_l2_norm_ratio is None), f"you can't specify both `max_l2_norm_value` and `max_l2_norm_ratio` simultaneously."
 
-        self._ffn = MultiLayerPerceptron(n_dim_in=n_dim_in, n_dim_out=n_dim_in, n_dim_hidden=n_dim_hidden, n_layer=n_layer, activation_function=activation_function, bias=bias)
+        self._ffn = MultiLayerPerceptron(n_dim_in=n_dim_in, n_dim_out=n_dim_in, n_dim_hidden=n_dim_hidden, n_layer=n_layer, activation_function=activation_function, bias=bias, init_zeroes=init_zeroes)
         self._max_l2_norm_value = max_l2_norm_value
         self._max_l2_norm_ratio = max_l2_norm_ratio
 
