@@ -44,13 +44,14 @@ import platform
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Subset, BufferedShuffleDataset
+from torch.utils.data import DataLoader, Subset
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.trainer.supporters import CombinedLoader
 
 wd = os.path.dirname(__file__)
+wd = "./" if not wd else wd
 os.chdir(wd)
 DEFAULT_SAVE_DIR = os.path.join(wd, "./checkpoints/")
 _platform = platform.node()
@@ -109,8 +110,8 @@ def _default_configs():
         }
     }
 
-    for key, value in dict_defaults.items():
-        dict_defaults[key] = json.dumps(value)
+    # for key, value in dict_defaults.items():
+    #     dict_defaults[key] = json.dumps(value)
 
     return dict_defaults
 
@@ -118,6 +119,11 @@ def _parse_args():
 
     def nullable_string(value):
         return None if not value else value
+
+    def nullable_json_loads(value):
+        return {} if not value else json.loads(value)
+
+
 
     default_configs = _default_configs()
 
@@ -147,9 +153,10 @@ def _parse_args():
     parser.add_argument("--num_workers", required=False, type=int, default=0, help="Not available yet.")
     parser.add_argument("--version", required=False, type=nullable_string, default=None, help="model checkpoint version. if no specified, auto increment.")
 
-    for config_name in ("cfg_contrastive_learning_dataset", "cfg_gloss_projection_head", "cfg_context_projection_head", "cfg_similarity_class",
-                        "cfg_max_pool_margin_loss", "cfg_optimizer", "cfg_trainer"):
-        parser.add_argument(f"--{config_name}", required=False, type=json.loads, default=default_configs[config_name])
+    lst_config_names = ("cfg_contrastive_learning_dataset", "cfg_gloss_projection_head", "cfg_context_projection_head", "cfg_similarity_class",
+                        "cfg_max_pool_margin_loss", "cfg_optimizer", "cfg_trainer")
+    for config_name in lst_config_names:
+        parser.add_argument(f"--{config_name}", required=False, type=nullable_json_loads, default=json.dumps(default_configs[config_name]))
 
     args = parser.parse_args()
     if args.gpus is not None:
@@ -162,6 +169,19 @@ def _parse_args():
         attr_name = f"batch_size_{task_name}"
         if args.__dict__[attr_name] is None:
             args.__setattr__(attr_name, args.batch_size)
+
+    # overwrite with specified value.
+    print("=== overwrite default configurations ===")
+    for config_name in lst_config_names:
+        cfg_input = args.__dict__[config_name]
+        cfg_default = copy.deepcopy(default_configs[config_name])
+        for arg_name, value in cfg_input.items():
+            default_value = cfg_default[arg_name]
+            if default_value != value:
+                print(f"{config_name}.{arg_name}:{default_value} -> {value}")
+            cfg_default[arg_name] = value
+        args.__setattr__(config_name, cfg_default)
+    print("=========")
 
     return args
 
