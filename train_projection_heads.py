@@ -121,9 +121,8 @@ def _parse_args():
         return None if not value else value
 
     def nullable_json_loads(value):
+        value = value.replace("'","\"") if isinstance(value, str) else value
         return {} if not value else json.loads(value)
-
-
 
     default_configs = _default_configs()
 
@@ -178,7 +177,7 @@ def _parse_args():
         for arg_name, value in cfg_input.items():
             default_value = cfg_default[arg_name]
             if default_value != value:
-                print(f"{config_name}.{arg_name}:{default_value} -> {value}")
+                print(f"{config_name}.{arg_name}: {default_value} -> {value}")
             cfg_default[arg_name] = value
         args.__setattr__(config_name, cfg_default)
     print("=========")
