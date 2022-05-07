@@ -116,25 +116,28 @@ def _default_configs():
 
 def _parse_args():
 
+    def nullable_string(value):
+        return None if not value else value
+
     default_configs = _default_configs()
 
     parser = argparse.ArgumentParser(description="trainer for {gloss,context} projection heads using BERT embeddings.")
     parser.add_argument("--eval_dataset_name", required=False, type=str, default="WSDEval-ALL-bert-large-cased", help="Evaluation dataset name.")
     parser.add_argument("--dev_dataset_task_name", required=False, type=str, default="WSD-SemEval2007", help="Development dataset task name.")
     parser.add_argument("--gloss_dataset_name", required=False, type=str, default="SREF_basic_lemma_embeddings", help="Gloss embeddings dataset name.")
-    parser.add_argument("--context_dataset_name", required=False, type=str, default=None, help="Context embeddings dataset name. Specifying it enables max-pooling margin task.")
+    parser.add_argument("--context_dataset_name", required=False, type=nullable_string, default=None, help="Context embeddings dataset name. Specifying it enables max-pooling margin task.")
     parser.add_argument("--coef_max_pool_margin_loss", required=False, type=float, default=1.0, help="Coefficient of max-pooling margin task.")
-    parser.add_argument("--sense_annotated_dataset_name", required=False, type=str, default=None, help="Sense-annotated corpus embeddings dataset name. Specifying it enables supervised alignment task.")
+    parser.add_argument("--sense_annotated_dataset_name", required=False, type=nullable_string, default=None, help="Sense-annotated corpus embeddings dataset name. Specifying it enables supervised alignment task.")
     parser.add_argument("--coef_supervised_alignment_loss", required=False, type=float, default=1.0, help="Coefficient of supervised alignment task.")
     parser.add_argument("--gloss_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity"], help="gloss projection head class name.")
-    parser.add_argument("--context_projection_head_name", required=False, type=str, default=None, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity", "COPY"],
-                        help="gloss projection head class name.")
+    parser.add_argument("--context_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity", "COPY", "SHARED"],
+                        help="context projection head class name. SHARED: share with gloss projection head. COPY: copy initial model parameter from gloss projection head.")
     parser.add_argument("--similarity_class_name", required=False, type=str, default="CosineSimilarity", choices=["CosineSimilarity", "DotProductSimilarity", "ArcMarginProduct"],
                         help="similarity class for {contrastive, supervised alignment} tasks.")
     parser.add_argument("--use_positives_as_in_batch_negatives", required=False, type=bool, default=True, help="contrastive loss config. use positive examples as weak (=in-batch) negatives.")
     parser.add_argument("--log_every_n_steps", required=False, type=int, default=200)
     parser.add_argument("--val_check_interval", required=False, type=int, default=500)
-    parser.add_argument("--gpus", required=False, type=str, default=None, help="GPU device ids. e.g., `0,3,5`")
+    parser.add_argument("--gpus", required=False, type=nullable_string, default=None, help="GPU device ids. e.g., `0,3,5`")
     parser.add_argument("--batch_size", required=False, type=int, default=128, help="default batch size. if specified, apllied to all tasks.")
     parser.add_argument("--batch_size_contrastive", required=False, type=int, default=None, help="contrastive task batch size.")
     parser.add_argument("--batch_size_max_pool_margin", required=False, type=int, default=None, help="max-pool margin task batch size.")
@@ -142,7 +145,7 @@ def _parse_args():
     parser.add_argument("--max_epochs", required=True, type=int, help="max. number of epochs.")
     parser.add_argument("--shuffle", required=False, default=True, help="shuffle trainset.")
     parser.add_argument("--num_workers", required=False, type=int, default=0, help="Not available yet.")
-    parser.add_argument("--version", required=False, type=str, default=None, help="model checkpoint version. if no specified, auto increment.")
+    parser.add_argument("--version", required=False, type=nullable_string, default=None, help="model checkpoint version. if no specified, auto increment.")
 
     for config_name in ("cfg_contrastive_learning_dataset", "cfg_gloss_projection_head", "cfg_context_projection_head", "cfg_similarity_class",
                         "cfg_max_pool_margin_loss", "cfg_optimizer", "cfg_trainer"):
@@ -228,7 +231,7 @@ def main():
 
     ### context projection head
     context_projection_head_name = args.context_projection_head_name
-    if context_projection_head_name is None:
+    if context_projection_head_name == "SHARED":
         warnings.warn(f"gloss_projection_head and context_projection_head will be shared.")
         context_projection_head = gloss_projection_head
     elif context_projection_head_name == "COPY":
