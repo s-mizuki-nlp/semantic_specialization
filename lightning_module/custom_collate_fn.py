@@ -10,6 +10,15 @@ from torch.utils.data import Dataset, IterableDataset, BufferedShuffleDataset, D
 
 from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset
 
+# quick fix for BufferedShuffleDataset.
+# pytorch-lightning (pytorch_lightning.trainer.supporters.CombinedLoader) requires __len__() method for every datasets when you specify multiple dataloaders.
+# in order to make BufferedShuffleDataset available, we assign primitive __len__() method on the fly.
+
+def _len(self):
+    return len(self.dataset)
+
+BufferedShuffleDataset.__len__ = _len
+
 
 def setup_data_loader(task_name, dataset, shuffle, device, batch_size, gloss_dataset = None, **kwargs):
     """
@@ -42,7 +51,7 @@ def setup_data_loader(task_name, dataset, shuffle, device, batch_size, gloss_dat
 
     if shuffle:
         if isinstance(dataset, IterableDataset):
-            dataset = BufferedShuffleDataset(dataset, buffer_size=batch_size*16)
+            dataset = BufferedShuffleDataset(dataset, buffer_size=batch_size*32)
             shuffle = False
     data_loader = DataLoader(dataset, collate_fn=_collate_fn, batch_size=batch_size, shuffle=shuffle, **kwargs)
 
