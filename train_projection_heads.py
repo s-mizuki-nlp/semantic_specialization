@@ -35,7 +35,7 @@
 # ## 評価用リソース
 # * WSDタスク評価用データセット: sense_annotated_corpus.cfg_evaluation["WSDEval-ALL-bert-large-cased"]
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import sys, io, os, json, copy, warnings
 from pprint import pprint
 import argparse
@@ -115,7 +115,7 @@ def _default_configs():
 
     return dict_defaults
 
-def _parse_args():
+def _parse_args(exclude_required_arguments: bool = False):
 
     def nullable_string(value):
         return None if not value else value
@@ -134,9 +134,7 @@ def _parse_args():
     parser.add_argument("--coef_max_pool_margin_loss", required=False, type=float, default=1.0, help="Coefficient of max-pooling margin task.")
     parser.add_argument("--sense_annotated_dataset_name", required=False, type=nullable_string, default=None, help="Sense-annotated corpus embeddings dataset name. Specifying it enables supervised alignment task.")
     parser.add_argument("--coef_supervised_alignment_loss", required=False, type=float, default=1.0, help="Coefficient of supervised alignment task.")
-    parser.add_argument("--gloss_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity"], help="gloss projection head class name.")
-    parser.add_argument("--context_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity", "COPY", "SHARED"],
-                        help="context projection head class name. SHARED: share with gloss projection head. COPY: copy initial model parameter from gloss projection head.")
+
     parser.add_argument("--similarity_class_name", required=False, type=str, default="CosineSimilarity", choices=["CosineSimilarity", "DotProductSimilarity", "ArcMarginProduct"],
                         help="similarity class for {contrastive, supervised alignment} tasks.")
     parser.add_argument("--use_positives_as_in_batch_negatives", required=False, type=bool, default=True, help="contrastive loss config. use positive examples as weak (=in-batch) negatives.")
@@ -147,10 +145,15 @@ def _parse_args():
     parser.add_argument("--batch_size_contrastive", required=False, type=int, default=None, help="contrastive task batch size.")
     parser.add_argument("--batch_size_max_pool_margin", required=False, type=int, default=None, help="max-pool margin task batch size.")
     parser.add_argument("--batch_size_supervised_alignment", required=False, type=int, default=None, help="supervised alignment task batch size.")
-    parser.add_argument("--max_epochs", required=True, type=int, help="max. number of epochs.")
+    parser.add_argument("--max_epochs", required=False, type=int, default=10, help="max. number of epochs.")
     parser.add_argument("--shuffle", required=False, default=True, help="shuffle trainset.")
     parser.add_argument("--num_workers", required=False, type=int, default=0, help="Not available yet.")
     parser.add_argument("--version", required=False, type=nullable_string, default=None, help="model checkpoint version. if no specified, auto increment.")
+    if not exclude_required_arguments:
+        parser.add_argument("--gloss_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity"], help="gloss projection head class name.")
+        parser.add_argument("--context_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity", "COPY", "SHARED"],
+                            help="context projection head class name. SHARED: share with gloss projection head. COPY: copy initial model parameter from gloss projection head.")
+
 
     lst_config_names = ("cfg_contrastive_learning_dataset", "cfg_gloss_projection_head", "cfg_context_projection_head", "cfg_similarity_class",
                         "cfg_max_pool_margin_loss", "cfg_optimizer", "cfg_trainer")
@@ -180,14 +183,21 @@ def _parse_args():
                 print(f"{config_name}.{arg_name}: {default_value} -> {value}")
             cfg_default[arg_name] = value
         args.__setattr__(config_name, cfg_default)
-    print("=========")
 
     return args
 
+def _update_args(args, params):
+    """updates args in-place"""
+    dargs = vars(args)
+    dargs.update(params)
 
-def main():
-
-    args = _parse_args()
+def main(dict_external_args: Optional[Dict[str, Any]] = None, verbose: bool = True):
+    if dict_external_args is not None:
+        args = _parse_args(exclude_required_arguments=True)
+        _update_args(args, dict_external_args)
+    else:
+        args = _parse_args()
+    pprint("==== arguments ===")
     pprint(vars(args), compact=True)
 
     ## Evaluation/Development Dataset
@@ -208,6 +218,8 @@ def main():
 
     ## Contrastive Task Dataset
     contrastive_dataset = ContrastiveLearningDataset(gloss_dataset=gloss_dataset, **args.cfg_contrastive_learning_dataset)
+    pprint("=== contrastive task dataset ===")
+    pprint(contrastive_dataset.verbose)
 
     ## (Optional) BERT Embeddings Dataset for Max-Pooling-Margin Task
     context_dataset_name = args.context_dataset_name
@@ -224,6 +236,9 @@ def main():
             max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=context_dataset, **cfg_task_dataset["TrainOnMonosemousCorpus"])
         else:
             raise ValueError(f"invalid context dataset name: {context_dataset_name}")
+    if max_pool_margin_dataset is not None:
+        pprint("=== maximum margin task dataset ===")
+        pprint(max_pool_margin_dataset.verbose)
 
     ## (optional) BERT Embeddings Dataset for Supervised Alignment Task
     ## 事実上SemCor一択．
@@ -235,6 +250,9 @@ def main():
         supervised_alignment_dataset = WSDTaskDataset(bert_embeddings_dataset=sense_annotated_dataset, **cfg_task_dataset["WSD"])
     else:
         raise ValueError(f"invalid sense-annotated dataset name: {sense_annotated_dataset_name}")
+    if supervised_alignment_dataset is not None:
+        pprint("=== supervised gloss-context alignment task dataset ===")
+        pprint(supervised_alignment_dataset.verbose)
 
     ## Projection heads
     _encoder_classes = dict(inspect.getmembers(encoder, inspect.isclass))
@@ -327,13 +345,12 @@ def main():
 
     ### Contrastive Task
     contrastive_dataset_val = Subset(contrastive_dataset, indices=list(range(int(len(contrastive_dataset)*0.05))))
-    task_name = "contrastive"
-    val_data_loaders[task_name] = custom_collate_fn.setup_data_loader(task_name="contrastive", dataset=contrastive_dataset_val,
+    val_data_loaders["contrastive"] = custom_collate_fn.setup_data_loader(task_name="contrastive", dataset=contrastive_dataset_val,
                                                     shuffle=False, device=args.device, batch_size=args.batch_size_contrastive)
 
     ### Supervised alignment Task
-    # * Development setを使う．
-    val_data_loaders[task_name] = custom_collate_fn.setup_data_loader(task_name="supervised_alignment", dataset=dev_dataset, gloss_dataset=gloss_dataset,
+    # Development setを使う．
+    val_data_loaders["supervised_alignment"] = custom_collate_fn.setup_data_loader(task_name="supervised_alignment", dataset=dev_dataset, gloss_dataset=gloss_dataset,
                                                     shuffle=False, device=args.device, batch_size=args.batch_size_supervised_alignment)
 
     for task_name, data_loader in val_data_loaders.items():
@@ -354,8 +371,9 @@ def main():
                                      model_parameter_schedulers=None,
                                      loss_parameter_schedulers=None,
                                      hparams=vars(args))
+    print(model.hparams)
 
-    logger = pl_loggers.TensorBoardLogger(save_dir=DEFAULT_SAVE_DIR, name=ENV_NAME, version=args.version, default_hp_metric=False)
+    logger = pl_loggers.TensorBoardLogger(save_dir=DEFAULT_SAVE_DIR, name=ENV_NAME, version=args.version, default_hp_metric=True)
     checkpoint_callback = ModelCheckpoint(filename="{epoch}", save_last=True)
 
     system = pl.Trainer(logger=logger, callbacks=[checkpoint_callback],

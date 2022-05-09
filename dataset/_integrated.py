@@ -244,6 +244,14 @@ class WSDTaskDataset(IterableDataset):
 
         self._bert_embeddings.return_record_only = False
 
+    @property
+    def verbose(self):
+        lst_attr_names = "has_ground_truth,return_level".split(",")
+        ret = {attr_name:getattr(self, "_" + attr_name) for attr_name in lst_attr_names}
+        ret["__len__"] = self.__len__()
+        ret["bert_embeddings_dataset"] = self._bert_embeddings.verbose
+        return ret
+
 
 class WSDTaskDatasetCollateFunction(object):
 

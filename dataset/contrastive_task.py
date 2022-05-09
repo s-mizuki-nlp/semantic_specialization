@@ -145,10 +145,10 @@ class ContrastiveLearningDataset(Dataset):
 
     @property
     def verbose(self):
-        lst_attr_names = "num_hard_negatives,semantic_relation_for_positives,use_taxonomy_distance_for_sampling_positives,iterate_over_lemma_or_lemma_key,shuffle".split(",")
+        lst_attr_names = "num_hard_negatives,semantic_relation_for_positives,use_taxonomy_distance_for_sampling_positives,iterate_over_lemma_or_lemma_key".split(",")
         ret = {attr_name:getattr(self, "_" + attr_name) for attr_name in lst_attr_names}
         ret["__len__"] = self.__len__()
-        ret["corpus_dataset"] = self._gloss_dataset.verbose
+        ret["gloss_dataset"] = self._gloss_dataset.verbose
         return ret
 
     @property
