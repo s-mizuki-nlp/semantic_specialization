@@ -5,6 +5,7 @@ import io, os, json
 from typing import Union, Collection, Optional, Dict, Any, Iterable, Callable, List
 from torch.utils.data import Dataset
 
+import xml.etree.ElementTree
 import bs4.element
 from bs4 import BeautifulSoup
 from nltk.corpus import wordnet as wn
@@ -21,6 +22,7 @@ class WSDEvaluationDataset(Dataset):
                  transform_functions = None,
                  filter_function: Optional[Union[Callable, List[Callable]]] = None,
                  entity_filter_function: Optional[Union[Callable, List[Callable]]] = None,
+                 is_omsti_corpus: bool = False,
                  description: str = ""):
 
         """
@@ -36,6 +38,7 @@ class WSDEvaluationDataset(Dataset):
         :param transform_functions: データ変形定義，Dictionaryを指定．keyはフィールド名，valueは変形用関数
         :param filter_function: 除外するか否かを判定する関数
         :param description: 説明
+        :param is_omsti_corpus: SemCor+OMSTI corpusか否か．SemCor+OMSTIの場合はxml.etree.ElementTree parserを使用する
         """
 
         super().__init__()
@@ -66,8 +69,9 @@ class WSDEvaluationDataset(Dataset):
             self._entity_filter_function = [entity_filter_function]
 
         self._n_sample = None
+        self._is_omsti_corpus = is_omsti_corpus
 
-        self._raw_records = self._preload_sentences()
+        self._raw_records = self._preload_sentences(is_omsti_corpus=is_omsti_corpus)
         self._preprocessed_records = [record for record in self]
 
     def _load_ground_truth_labels(self, path: str):
@@ -101,7 +105,7 @@ class WSDEvaluationDataset(Dataset):
             lst_candidates.append(dict_candidate)
         return lst_candidates
 
-    def _parse_instance_node(self, instance_node: bs4.element.Tag):
+    def _parse_instance_node(self, instance_node: Union[bs4.element.Tag, xml.etree.ElementTree.Element]):
         _id = instance_node.get("id")
         dict_output = {
             "id": _id,
@@ -126,20 +130,33 @@ class WSDEvaluationDataset(Dataset):
         sentence_id = delimiter.join(lst_ids[:3])
         return corpus_id, document_id, sentence_id
 
-    def _parse_sentence_node(self, sentence_node: bs4.element.Tag):
+    def _parse_sentence_node(self, sentence_node: Union[bs4.element.Tag, xml.etree.ElementTree.Element]):
+
+        def _extract_surface_nodes(_node):
+            if isinstance(_node, bs4.element.Tag):
+                node_surfaces = _node.select("wf,instance")
+            elif isinstance(_node, xml.etree.ElementTree.Element):
+                node_surfaces = _node
+            return node_surfaces
+
+        def _get_node_type(_node):
+            if isinstance(_node, bs4.element.Tag):
+                node_type = _node.name
+            elif isinstance(_node, xml.etree.ElementTree.Element):
+                node_type = _node.tag
+            return node_type
 
         # extract words
         lst_words = []
         lst_entities = []
         lst_surfaces = []
-        node_surfaces = sentence_node.select("wf,instance")
-        for node_surface in node_surfaces:
+        for node_surface in _extract_surface_nodes(sentence_node):
             words = node_surface.text.split(" ")
             span = [len(lst_words), len(lst_words) + len(words)]
             lst_words += words
 
             # extract wsd entity
-            if node_surface.name == "instance":
+            if _get_node_type(node_surface) == "instance":
                 dict_instance = self._parse_instance_node(node_surface)
                 dict_instance["span"] = span
                 lst_entities.append(dict_instance)
@@ -180,7 +197,7 @@ class WSDEvaluationDataset(Dataset):
 
         return source_sentence_
 
-    def _sentence_loader(self) -> Iterable[Dict[str, Any]]:
+    def _sentence_loader_default(self):
         ifs = io.open(self._path, mode="r")
         soup = BeautifulSoup(ifs, features="lxml")
 
@@ -190,9 +207,22 @@ class WSDEvaluationDataset(Dataset):
 
         ifs.close()
 
-    def _preload_sentences(self) -> List[Dict[str, Any]]:
+    def _sentence_loader_for_omsti(self):
+        tree = xml.etree.ElementTree.parse(self._path)
+
+        xpath_selector = ".//corpus/text/sentence"
+        for sentence_node in tree.iterfind(xpath_selector):
+            yield self._parse_sentence_node(sentence_node)
+
+    def _sentence_loader(self, is_omsti_corpus: bool) -> Iterable[Dict[str, Any]]:
+        if is_omsti_corpus:
+            return self._sentence_loader_for_omsti()
+        else:
+            return self._sentence_loader_default()
+
+    def _preload_sentences(self, is_omsti_corpus: bool) -> List[Dict[str, Any]]:
         lst_sentences = []
-        for record in self._sentence_loader():
+        for record in self._sentence_loader(is_omsti_corpus=is_omsti_corpus):
             lst_sentences.append(record)
         return lst_sentences
 
