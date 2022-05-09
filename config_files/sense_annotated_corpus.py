@@ -84,6 +84,15 @@ cfg_training = {
         "is_omsti_corpus": True,
         "description": "WSD SemCor+OMSTI corpora, excluding no-sense-annotated sentences.",
     },
+    "SemCor+OMSTI-bert-large-cased": {
+        "path": pick_first_available_path(
+            os.path.join(DIR_LOCAL, "bert-large-cased_SemCor+OMSTI.hdf5"),
+            os.path.join(DIR_TRAINSET_EMBEDDINGS, "bert-large-cased_SemCor+OMSTI.hdf5")
+        ),
+        "padding": False,
+        "max_sequence_length": None,
+        "description": "WSD SemCor+OMSTI corpora (excluding no-sense-annotated sentences) encoded by BERT-large-cased."
+    },
     "WordNet_Gloss_Corpus-bert-large-cased": {
         "path": pick_first_available_path(
             os.path.join(DIR_LOCAL, "bert-large-cased_WordNet_Gloss_Corpus.hdf5"),
