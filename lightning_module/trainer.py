@@ -9,7 +9,6 @@ from typing import Optional, Dict, Callable, Union, Any, Tuple
 import warnings
 from collections import defaultdict
 import pickle
-import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -57,9 +56,8 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         self._gloss_projection_head = gloss_projection_head
         self._context_projection_head = context_projection_head
 
-        # ToDo: implement hyper-parameter export feature on encoder when saving hyper-parameters are helpful.
-        hparams = {} if hparams is None else hparams
-        self.save_hyperparameters(hparams)
+        _hparams = {} if hparams is None else hparams
+        self.save_hyperparameters(_hparams)
 
         # set loss functions
         self._contrastive_loss = contrastive_loss
