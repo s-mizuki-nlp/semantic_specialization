@@ -192,14 +192,15 @@ def _update_args(args, params):
     dargs = vars(args)
     dargs.update(params)
 
-def main(dict_external_args: Optional[Dict[str, Any]] = None, verbose: bool = True):
+def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: str = "hp/wsd_eval_ALL", verbose: bool = True) -> float:
     if dict_external_args is not None:
         args = _parse_args(exclude_required_arguments=True)
         _update_args(args, dict_external_args)
     else:
         args = _parse_args()
-    pprint("==== arguments ===")
-    pprint(vars(args), compact=True)
+    if verbose:
+        pprint("==== arguments ===")
+        pprint(vars(args), compact=True)
 
     ## Evaluation/Development Dataset
     print("loading evaluation dataset...")
@@ -219,8 +220,9 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, verbose: bool = Tr
 
     ## Contrastive Task Dataset
     contrastive_dataset = ContrastiveLearningDataset(gloss_dataset=gloss_dataset, **args.cfg_contrastive_learning_dataset)
-    pprint("=== contrastive task dataset ===")
-    pprint(contrastive_dataset.verbose)
+    if verbose:
+        pprint("=== contrastive task dataset ===")
+        pprint(contrastive_dataset.verbose)
 
     ## (Optional) BERT Embeddings Dataset for Max-Pooling-Margin Task
     context_dataset_name = args.context_dataset_name
@@ -238,8 +240,9 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, verbose: bool = Tr
         else:
             raise ValueError(f"invalid context dataset name: {context_dataset_name}")
     if max_pool_margin_dataset is not None:
-        pprint("=== maximum margin task dataset ===")
-        pprint(max_pool_margin_dataset.verbose)
+        if verbose:
+            pprint("=== maximum margin task dataset ===")
+            pprint(max_pool_margin_dataset.verbose)
 
     ## (optional) BERT Embeddings Dataset for Supervised Alignment Task
     ## 事実上SemCor一択．
@@ -252,8 +255,9 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, verbose: bool = Tr
     else:
         raise ValueError(f"invalid sense-annotated dataset name: {sense_annotated_dataset_name}")
     if supervised_alignment_dataset is not None:
-        pprint("=== supervised gloss-context alignment task dataset ===")
-        pprint(supervised_alignment_dataset.verbose)
+        if verbose:
+            pprint("=== supervised gloss-context alignment task dataset ===")
+            pprint(supervised_alignment_dataset.verbose)
 
     ## Projection heads
     _encoder_classes = dict(inspect.getmembers(encoder, inspect.isclass))
@@ -372,7 +376,6 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, verbose: bool = Tr
                                      model_parameter_schedulers=None,
                                      loss_parameter_schedulers=None,
                                      hparams=vars(args))
-    print(model.hparams)
 
     logger = pl_loggers.TensorBoardLogger(save_dir=DEFAULT_SAVE_DIR, name=ENV_NAME, version=args.version, default_hp_metric=True)
     checkpoint_callback = ModelCheckpoint(filename="{epoch}", save_last=True)
@@ -388,10 +391,14 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, verbose: bool = Tr
     print(f"checkpoint will be saved: {logger.log_dir}")
 
     system.fit(model,
-               train_dataloaders=CombinedLoader(train_data_loaders, mode="max_size_cycle"),
-               val_dataloaders=CombinedLoader(val_data_loaders, mode="max_size_cycle"))
+               train_dataloaders=CombinedLoader(train_data_loaders, mode="min_size"),
+               val_dataloaders=CombinedLoader(val_data_loaders, mode="max_size_cycle")
+               )
 
     print(f"finished: {ENV_NAME}/version_{args.version}")
+
+    if returned_metric is not None:
+        return system.logged_metrics[returned_metric]
 
 
 if __name__ == "__main__":
