@@ -98,7 +98,8 @@ def _default_configs():
         },
         "cfg_max_pool_margin_loss": {
             "similarity_module": None,
-            "max_margin": 0.8
+            "max_margin": 0.8,
+            "top_k": 1
         },
         "cfg_optimizer": {
             "lr":0.001,
