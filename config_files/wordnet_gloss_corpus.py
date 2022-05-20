@@ -53,6 +53,14 @@ cfg_embeddings = {
         "lemma_surface_form_lowercase": False,
         "description": "Basic lemma embeddings used in SREF[Wang and Wang, EMNLP2020]. This embeddings are computed without using augmented example sentences."
     },
+    "SREF_enhanced_embeddings_without_augmentation": {
+        "path": os.path.join(DIR_SREF_EMBEDDINGS, "emb_wn_all-relations_gloss+examples.pkl"),
+        "target_pos": ["n","v","s","r"],
+        "l2_norm": False,
+        "use_first_embeddings_only": True,
+        "lemma_surface_form_lowercase": False,
+        "description": "Semantic Relation Enhanced lemma embeddings used in SREF[Wang and Wang, EMNLP2020]. This embeddings are computed without using augmented example sentences."
+    },
     "SREF_Sense_Corpus-AVG-bert-large-cased": {
         "kwargs_bert_embeddings_dataset": cfg_training["SREF_Sense_Corpus-bert-large-cased"],
         "pooling_method": "average",
