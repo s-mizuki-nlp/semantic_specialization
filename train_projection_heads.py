@@ -149,6 +149,7 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--max_epochs", required=False, type=int, default=10, help="max. number of epochs.")
     parser.add_argument("--shuffle", required=False, default=True, help="shuffle trainset.")
     parser.add_argument("--num_workers", required=False, type=int, default=0, help="Not available yet.")
+    parser.add_argument("--name", required=False, type=str, default=None, help=f"name of the model checkpoints. if no specified, {ENV_NAME}")
     parser.add_argument("--version", required=False, type=nullable_string, default=None, help="model checkpoint version. if no specified, auto increment.")
     if not exclude_required_arguments:
         parser.add_argument("--gloss_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity"], help="gloss projection head class name.")
@@ -377,7 +378,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
                                      loss_parameter_schedulers=None,
                                      hparams=vars(args))
 
-    logger = pl_loggers.TensorBoardLogger(save_dir=DEFAULT_SAVE_DIR, name=ENV_NAME, version=args.version, default_hp_metric=True)
+    name = ENV_NAME if args.name is None else args.name
+    logger = pl_loggers.TensorBoardLogger(save_dir=DEFAULT_SAVE_DIR, name=name, version=args.version, default_hp_metric=True)
     checkpoint_callback = ModelCheckpoint(filename="{epoch}", save_last=True)
 
     system = pl.Trainer(logger=logger, callbacks=[checkpoint_callback],
