@@ -42,6 +42,9 @@ class ArcMarginProduct(nn.Module):
             margin: margin [Rad]
             return: cos(theta + margin)/temperature for hard example (`is_hard_examples=True`), cos(theta)/temperature otherwise
         """
+
+    _EPS = 1E-7
+
     def __init__(self, margin=0.10, temperature: float = 0.1, easy_margin=False, **kwargs):
         super().__init__()
         self._temperature = temperature
@@ -55,8 +58,8 @@ class ArcMarginProduct(nn.Module):
         self.mm = math.sin(math.pi - margin) * margin
 
     def forward(self, x: torch.Tensor, y: torch.Tensor, is_hard_examples: bool, **kwargs):
-        cos_theta = cosine_similarity(x, y, dim=-1)
-        sin_theta = torch.sqrt((1.0 - torch.pow(cos_theta, 2)).clamp(0, 1))
+        cos_theta = cosine_similarity(x, y, dim=-1).clamp(-1.0+self._EPS, 1.0-self._EPS)
+        sin_theta = torch.sqrt((1.0 - cos_theta*cos_theta).clamp(self._EPS, 1.0-self._EPS))
         # phi = cos(theta + m)
         phi = cos_theta * self.cos_m - sin_theta * self.sin_m
 
