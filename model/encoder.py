@@ -105,6 +105,7 @@ class NormRestrictedShift(nn.Module):
     def forward(self, x):
         z = self._ffn.forward(x)
         # transform to [-1, 1]
+        # NOTE: shoud we replace with tanh?
         dx = 2. * torch.sigmoid(z) - 1.
         if self._max_l2_norm_value is not None:
             # epsilon: (1,)
