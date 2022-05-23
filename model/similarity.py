@@ -42,7 +42,7 @@ class ArcMarginProduct(nn.Module):
             margin: margin [Rad]
             return: cos(theta + margin)/temperature for hard example (`is_hard_examples=True`), cos(theta)/temperature otherwise
         """
-    def __init__(self, margin=0.50, temperature: float = 0.1, easy_margin=False, **kwargs):
+    def __init__(self, margin=0.10, temperature: float = 0.1, easy_margin=False, **kwargs):
         super().__init__()
         self._temperature = temperature
         self._margin = margin
