@@ -11,12 +11,13 @@ import optuna
 # from train_projection_heads import main
 from mock_trainer import main
 
-gpu_id = None
-env_name = None
+global gpu_id
+global env_name
 
 def _parse_args():
     parser = argparse.ArgumentParser(description="distributed hyper-parameter search for {gloss,context} projection heads trainer.")
     parser.add_argument("--storage", "-s", type=str, required=True, help="storage parameter of optuna.load_study(). e.g., mysql+pymysql://{USER}:{PASSWORD}@{HOST}/{DB}")
+    parser.add_argument("--n_trials", "-n", type=int, required=True, help="number of trials.")
     parser.add_argument("--study_name", type=str, required=True, help="study-name parameter of optuna.load_study(). It must be consistent among optuna workers.")
     parser.add_argument("--env_name", type=str, required=True, default=None, help="name parameter of TensorBoardLogger(). It can be handy for distinguishing experiment groups")
     parser.add_argument("--gpus", type=str, required=False, default=None, help="GPU ID used for optuna worker.")
@@ -132,6 +133,6 @@ if __name__ == "__main__":
     if args.debug:
         study = optuna.create_study()
     else:
-        study = optuna.load_study(study_name=args.study_name, storage=args.storage)
-    study.optimize(objective, n_trials=100)
+        study = optuna.create_study(study_name=args.study_name, storage=args.storage, load_if_exists=True)
+    study.optimize(objective, n_trials=args.n_trials)
     pprint(study.best_trial)

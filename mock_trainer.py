@@ -23,7 +23,7 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         pprint("==== arguments ===")
         pprint(vars(args), compact=True)
 
-    # time.sleep(30)
+    time.sleep(30)
 
     if args.similarity_class_name == "ArcMarginProduct":
         if args.cfg_similarity_class["temperature"] < 0.1:

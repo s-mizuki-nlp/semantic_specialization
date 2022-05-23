@@ -1,17 +1,13 @@
 #!/bin/sh
 
-EMBEDDINGS_DIR="/home/sakae/Windows/public_model/embedding"
-EMBEDDINGS_W2V="word2vec-google-news-300/word2vec-google-news-300"
-
-python train_unsupervised.py \
---embeddings="${EMBEDDINGS_DIR}/${EMBEDDINGS_W2V}" \
---embeddings_type="word2vec" \
---batch_size=128 \
---epochs=10 \
---validation_split=0.001 \
---config_file="./config_files/template_unsupervised.py" \
---log_dir="./log/" \
---experiment_name="word2vec" \
---model_dir="./saved_model/word2vec/" \
---verbose
-# gpus="1,2"
+python train_projection_heads.py \
+--gloss_dataset_name="SREF_basic_lemma_embeddings" \
+--context_dataset_name="" \
+--coef_max_pool_margin_loss=1.0 \
+--gloss_projection_head_name="NormRestrictedShift" \
+--context_projection_head_name="SHARED" \
+--cfg_contrastive_learning_dataset='{"num_hard_negatives":0}' \
+--use_positives_as_in_batch_negatives=True \
+--gpus="" \
+--batch_size=256 \
+--max_epochs=10
