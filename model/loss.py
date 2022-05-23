@@ -54,12 +54,13 @@ class ContrastiveLoss(L._Loss):
 
         # vec_sim_pos: (n,)
         # is_hard_examples: affects when similarity_module is ArcMarginProduct.
-        vec_sim_pos = self._similarity(queries, positives, is_hard_examples = True)
+        # by specifying is_hard_examples=True, pairs get even closer. i.e., we should specify True for (target, positive) pairs.
+        vec_sim_pos = self._similarity(queries, positives, is_hard_examples=True)
 
         # in-batch negatives: (n, n-1)
         if self._use_positives_as_in_batch_negatives:
             # mat_sim: (n, n)
-            mat_sim = self._similarity(queries.unsqueeze(dim=1), positives)
+            mat_sim = self._similarity(queries.unsqueeze(dim=1), positives, is_hard_examples=False)
             # we extract off-diagonal elements as the in-batch negatives.
             mat_sim_neg_in_batch = self.get_off_diagonal_elements(mat_sim)
         else:
