@@ -7,8 +7,10 @@
 from typing import Optional, Dict, Any
 import os, sys, io
 from pprint import pprint
+import time
 
 from train_projection_heads import _parse_args, _update_args
+
 
 
 def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: str = "hp/wsd_eval_ALL", verbose: bool = True) -> float:
@@ -20,6 +22,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
     if verbose:
         pprint("==== arguments ===")
         pprint(vars(args), compact=True)
+
+    # time.sleep(30)
 
     if args.similarity_class_name == "ArcMarginProduct":
         if args.cfg_similarity_class["temperature"] < 0.1:

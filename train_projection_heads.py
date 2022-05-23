@@ -162,7 +162,7 @@ def _parse_args(exclude_required_arguments: bool = False):
     for config_name in lst_config_names:
         parser.add_argument(f"--{config_name}", required=False, type=nullable_json_loads, default=json.dumps(default_configs[config_name]))
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
     if args.gpus is not None:
         args.gpus = list(map(int, args.gpus.split(",")))
         args.__setattr__("device", f"cuda:{args.gpus[0]}")
