@@ -163,6 +163,10 @@ def _parse_args(exclude_required_arguments: bool = False):
         parser.add_argument(f"--{config_name}", required=False, type=nullable_json_loads, default=json.dumps(default_configs[config_name]))
 
     args, unknown = parser.parse_known_args()
+
+    return args
+
+def _postprocess_args(args):
     if args.gpus is not None:
         args.gpus = list(map(int, args.gpus.split(",")))
         args.__setattr__("device", f"cuda:{args.gpus[0]}")
@@ -176,6 +180,9 @@ def _parse_args(exclude_required_arguments: bool = False):
 
     # overwrite with specified value.
     print("=== overwrite default configurations ===")
+    default_configs = _default_configs()
+    lst_config_names = ("cfg_contrastive_learning_dataset", "cfg_gloss_projection_head", "cfg_context_projection_head", "cfg_similarity_class",
+                                                "cfg_max_pool_margin_loss", "cfg_optimizer", "cfg_trainer")
     for config_name in lst_config_names:
         cfg_input = args.__dict__[config_name]
         cfg_default = copy.deepcopy(default_configs[config_name])
@@ -199,6 +206,7 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         _update_args(args, dict_external_args)
     else:
         args = _parse_args()
+    args = _postprocess_args(args)
     if verbose:
         pprint("==== arguments ===")
         pprint(vars(args), compact=True)
@@ -231,6 +239,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         max_pool_margin_dataset = None
     elif context_dataset_name == evalset_embeddings_name:
         max_pool_margin_dataset = eval_dataset
+    elif context_dataset_name == "":
+        max_pool_margin_dataset = None
     else:
         if context_dataset_name in sense_annotated_corpus.cfg_training:
             context_dataset = BERTEmbeddingsDataset(**sense_annotated_corpus.cfg_training[context_dataset_name])

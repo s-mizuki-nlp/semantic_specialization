@@ -8,8 +8,8 @@ from pprint import pprint
 
 import optuna
 
-# from train_projection_heads import main
-from mock_trainer import main
+from train_projection_heads import main
+# from mock_trainer import main
 
 global gpu_id
 global env_name
@@ -122,7 +122,7 @@ def objective(trial: optuna.Trial):
 
     dict_args["context_dataset_name"] = context_dataset_name
 
-    return -main(dict_args, returned_metric="hp/wsd_eval_ALL", verbose=False)
+    return -main(dict_args, returned_metric="hp/wsd_eval_ALL", verbose=True)
 
 if __name__ == "__main__":
 
