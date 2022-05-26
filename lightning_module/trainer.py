@@ -361,6 +361,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         for pos, _metrics in dict_metrics["pos_orig"].items():
             dict_eval_metrics[f"hp/wsd_eval_{pos}"] = _metrics["f1_score_by_raganato"]
         self.log_dict(dict_eval_metrics, on_step=False, on_epoch=True)
+        self.log("hp_metric", dict_eval_metrics["hp/wsd_eval_ALL"])
 
     def optimizer_step(
         self,
