@@ -108,7 +108,7 @@ def _default_configs():
         "cfg_trainer": {
             # "accumulate_grad_batches":None,
             # "gradient_clip_val":1.0
-            "enable_progress_bar": True
+            "progress_bar_refresh_rate": 20
         }
     }
 

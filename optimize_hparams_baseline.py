@@ -34,10 +34,7 @@ def objective(trial: optuna.Trial):
         "name": env_name,
         "gloss_dataset_name": "SREF_basic_lemma_embeddings",
         "max_epochs": 10,
-        "shuffle": True,
-        "cfg_trainer": {
-            "enable_progress_bar": False
-        }
+        "shuffle": True
     }
 
     # always enable max-pool margin task
