@@ -44,6 +44,8 @@ def objective(trial: optuna.Trial):
 
     # optimization
     dict_args["batch_size"] = trial.suggest_categorical("batch_size", [64,128,256,512])
+    if dict_args["batch_size"] == 512:
+        dict_args["val_check_interval"] = 400
 
     # contrastive task に関する条件付け
     cfg_contrastive_learning_dataset = {
@@ -122,7 +124,7 @@ def objective(trial: optuna.Trial):
 
     dict_args["context_dataset_name"] = context_dataset_name
 
-    return -main(dict_args, returned_metric="hp/wsd_eval_ALL", verbose=True)
+    return -max( main(dict_args, returned_metric="hp/wsd_eval_ALL", verbose=True) - 0.67, -0.0)
 
 if __name__ == "__main__":
 
