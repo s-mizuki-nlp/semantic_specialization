@@ -41,7 +41,7 @@ def objective(trial: optuna.Trial):
     context_dataset_name = trial.suggest_categorical("context_dataset_name", ["SemCor-bert-large-cased", "SemCor+OMSTI-bert-large-cased"])
 
     # always use cosine similarity module
-    similarity_class_name = "CosineSimilarity"
+    similarity_class_name = "ArcMarginProduct"
 
     # optimization
     batch_size = trial.suggest_categorical("batch_size", [64,128,256,512])
@@ -89,7 +89,8 @@ def objective(trial: optuna.Trial):
 
     # similarity module
     cfg_similarity_class = {
-        "temperature": trial.suggest_loguniform("temperature", low=0.01, high=1.0)
+        "temperature": trial.suggest_loguniform("temperature", low=0.01, high=1.0),
+        "margin": trial.suggest_discrete_uniform("margin", low=0.1, high=0.5, q=0.1)
     }
     dict_args["cfg_similarity_class"] = cfg_similarity_class
     dict_args["similarity_class_name"] = similarity_class_name
