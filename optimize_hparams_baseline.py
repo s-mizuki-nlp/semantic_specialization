@@ -34,6 +34,7 @@ def objective(trial: optuna.Trial):
         "name": env_name,
         "gloss_dataset_name": "SREF_basic_lemma_embeddings",
         "max_epochs": 10,
+        "log_every_n_steps": 500,
         "shuffle": True
     }
 
