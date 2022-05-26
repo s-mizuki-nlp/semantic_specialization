@@ -46,6 +46,7 @@ def objective(trial: optuna.Trial):
     dict_args["batch_size"] = trial.suggest_categorical("batch_size", [64,128,256,512])
     if dict_args["batch_size"] == 512:
         dict_args["val_check_interval"] = 400
+        dict_args["max_epochs"] = 20
 
     # contrastive task に関する条件付け
     cfg_contrastive_learning_dataset = {
