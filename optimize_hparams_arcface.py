@@ -97,7 +97,7 @@ def objective(trial: optuna.Trial):
 
     dict_args["context_dataset_name"] = context_dataset_name
 
-    return -max( main(dict_args, returned_metric="hp/wsd_eval_ALL", verbose=True) - args.min_performance, 0.0)
+    return -max( main(dict_args, returned_metric="hp/wsd_eval_ALL", verbose=False) - args.min_performance, 0.0)
 
 if __name__ == "__main__":
 
