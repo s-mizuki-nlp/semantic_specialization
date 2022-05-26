@@ -350,7 +350,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
     }
     for task_name, datasets in dict_task_and_datasets.items():
         if datasets["dataset"] is not None:
-            train_data_loaders[task_name] = custom_collate_fn.setup_data_loader(task_name=task_name, shuffle=args.shuffle, device=args.device, **datasets)
+            train_data_loaders[task_name] = custom_collate_fn.setup_data_loader(task_name=task_name, shuffle=args.shuffle, device=args.device, pin_memory=True,
+                                                                                **datasets)
 
     for task_name, data_loader in train_data_loaders.items():
         batch = next(iter(data_loader))
@@ -362,12 +363,12 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
     ### Contrastive Task
     contrastive_dataset_val = Subset(contrastive_dataset, indices=list(range(int(len(contrastive_dataset)*0.05))))
     val_data_loaders["contrastive"] = custom_collate_fn.setup_data_loader(task_name="contrastive", dataset=contrastive_dataset_val,
-                                                    shuffle=False, device=args.device, batch_size=args.batch_size_contrastive)
+                                                    shuffle=False, device=args.device, batch_size=args.batch_size_contrastive, pin_memory=True)
 
     ### Supervised alignment Task
     # Development setを使う．
     val_data_loaders["supervised_alignment"] = custom_collate_fn.setup_data_loader(task_name="supervised_alignment", dataset=dev_dataset, gloss_dataset=gloss_dataset,
-                                                    shuffle=False, device=args.device, batch_size=args.batch_size_supervised_alignment)
+                                                    shuffle=False, device=args.device, batch_size=args.batch_size_supervised_alignment, pin_memory=True)
 
     for task_name, data_loader in val_data_loaders.items():
         batch = next(iter(data_loader))
