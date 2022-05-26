@@ -44,12 +44,13 @@ def objective(trial: optuna.Trial):
     similarity_class_name = "CosineSimilarity"
 
     # optimization
-    dict_args["batch_size"] = trial.suggest_categorical("batch_size", [64,128,256,512])
-    if dict_args["batch_size"] == 512:
-        dict_args["val_check_interval"] = 400
-        dict_args["max_epochs"] = 20
-    elif dict_args["batch_size"] == 256:
+    batch_size = trial.suggest_categorical("batch_size", [64,128,256,512])
+    dict_args["val_check_interval"] = int(1000 * 128 / dict_args["batch_size"])
+    if batch_size == 256:
         dict_args["max_epochs"] = 15
+    elif batch_size == 512:
+        dict_args["max_epochs"] = 20
+    dict_args["batch_size"] = batch_size
 
     # contrastive task に関する条件付け
     cfg_contrastive_learning_dataset = {
