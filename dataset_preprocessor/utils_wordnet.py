@@ -60,7 +60,12 @@ def get_synset_depth(synset, root_synset={"n":wn.synset("entity.n.01"), "v":None
     else:
         return (float(np.max(lst_depth)), float(np.min(lst_depth)), float(np.mean(lst_depth)))
 
-
+_MAP_JMWE_TO_WORDNET = {
+    "NOUN": wn.NOUN,
+    "VERB": wn.VERB,
+    "ADVERB": wn.ADV,
+    "ADJECTIVE": wn.ADJ
+}
 _MAP_UNIVERSAL_TO_WORDNET = {
     "NOUN": wn.NOUN,
     "VERB": wn.VERB,
@@ -68,6 +73,16 @@ _MAP_UNIVERSAL_TO_WORDNET = {
     "ADV": wn.ADV
 }
 _MAP_PTB_TO_UNIVERSAL = nltk.tagset_mapping("en-ptb", "universal")
+
+def jmwe_tagset_to_wordnet_tagset(jmwe_tag, na_value = "o"):
+    """
+    jMWE toolkit PoS tagset を WordNetの PoS tagset に変換する．
+    @param jmwe_tag: jMWE PoS tag
+    @param na_value: 変換先のWordNet PoS tagがない場合の出力
+    @return:　WordNet PoS tagset. {wn.NOUN, wn.VERB, wn.ADJ, wn.ADV, na_value} のいずれか
+    """
+    wn_tag = _MAP_JMWE_TO_WORDNET.get(jmwe_tag, na_value)
+    return wn_tag
 
 def universal_tagset_to_wordnet_tagset(univ_tag, na_value = "o"):
     """
