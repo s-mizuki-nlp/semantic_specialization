@@ -121,8 +121,8 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
             t_query_embedding = torch.mean(t_query_embedding, dim=1)
 
         # inference using k-NN method.
-        t_candidate_lemma_key_embeddings = self._gloss_prjection_head.predict(t_candidate_lemma_key_embeddings)
-        t_query_embedding = self._context_projection_head.predict(t_query_embedding)
+        t_candidate_lemma_key_embeddings = self._gloss_prjection_head.predict(t_candidate_lemma_key_embeddings, is_gloss_embeddings=True)
+        t_query_embedding = self._context_projection_head.predict(t_query_embedding, is_gloss_embeddings=False)
         t_query_embeddings = torch.tile(t_query_embedding, (n_candidates, 1))
         assert t_candidate_lemma_key_embeddings.shape == t_query_embeddings.shape, f"query and candidate shape mismatch."
 

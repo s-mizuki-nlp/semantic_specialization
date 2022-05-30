@@ -201,9 +201,9 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
     def _forward_contrastive_task(self, projection_head: nn.Module, loss_function: ContrastiveLoss,
                                   query, positive, hard_negatives, num_hard_negatives):
-        _query = projection_head(query)
-        _positive = projection_head(positive)
-        _hard_negatives = None if hard_negatives is None else projection_head(hard_negatives)
+        _query = projection_head(query, is_gloss_embeddings=True)
+        _positive = projection_head(positive, is_gloss_embeddings=True)
+        _hard_negatives = None if hard_negatives is None else projection_head(hard_negatives, is_gloss_embeddings=True)
 
         if _hard_negatives is None:
             loss = loss_function.forward(queries=_query, positives=_positive)
@@ -214,9 +214,9 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
     def _forward_max_pool_margin_task(self, gloss_projection_head: nn.Module, context_projection_head: nn.Module, loss_function: MaxPoolingMarginLoss,
                                       query, targets, num_targets):
         # query: in-context entity embeddings of a text.
-        _query = context_projection_head(query)
+        _query = context_projection_head(query, is_gloss_embeddings=False)
         # targets: all candidate sense (=lemma key) embeddings for the query word (=lemma&pos pair).
-        _targets = gloss_projection_head(targets)
+        _targets = gloss_projection_head(targets, is_gloss_embeddings=True)
 
         loss = loss_function.forward(queries=_query, targets=_targets, num_target_samples=num_targets)
         return loss
@@ -224,11 +224,11 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
     def _forward_supervised_alignment_task(self, gloss_projection_head: nn.Module, context_projection_head: nn.Module, loss_function: ContrastiveLoss,
                                            query, positive, negatives, num_negatives):
         # query: in-context entity embeddings of a text.
-        _query = context_projection_head(query)
+        _query = context_projection_head(query, is_gloss_embeddings=False)
         # positive: ground-truth sense (=lemma key) embeddings for the query word.
-        _positive = gloss_projection_head(positive)
+        _positive = gloss_projection_head(positive, is_gloss_embeddings=True)
         # negatives: incorrect senses (=lemma keys) embeddings for the query word.
-        _negatives = gloss_projection_head(negatives)
+        _negatives = gloss_projection_head(negatives, is_gloss_embeddings=True)
 
         loss = loss_function.forward(queries=_query, positives=_positive, negatives=_negatives, num_negative_samples=num_negatives)
         return loss
@@ -288,8 +288,8 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         contrastive_loss = self._forward_contrastive_task(projection_head=self._gloss_projection_head, loss_function=self._contrastive_loss, **_batch)
 
         # contrastive objective related metrics: alignment, uniformity
-        _query = self._gloss_projection_head.forward(_batch["query"])
-        _positive = self._gloss_projection_head.forward(_batch["positive"])
+        _query = self._gloss_projection_head.forward(_batch["query"], is_gloss_embeddings=True)
+        _positive = self._gloss_projection_head.forward(_batch["positive"], is_gloss_embeddings=True)
         alignment = F.cosine_similarity(_query, _positive, dim=-1).mean()
         uniformity = pairwise_cosine_similarity(_query, reduction="mean")
 
@@ -304,9 +304,9 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                                                                                 # we use contrastive loss as an alternative.
                                                                                 loss_function=self._contrastive_loss,
                                                                                 **_batch)
-            _query = self._context_projection_head.forward(_batch["query"])
-            _positive = self._gloss_projection_head.forward(_batch["positive"])
-            _negatives = self._gloss_projection_head.forward(_batch["negatives"])
+            _query = self._context_projection_head.forward(_batch["query"], is_gloss_embeddings=False)
+            _positive = self._gloss_projection_head.forward(_batch["positive"], is_gloss_embeddings=False)
+            _negatives = self._gloss_projection_head.forward(_batch["negatives"], is_gloss_embeddings=False)
 
             gloss_context_similarity = F.cosine_similarity(_query, _positive, dim=-1).mean()
 

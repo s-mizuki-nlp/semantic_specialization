@@ -19,6 +19,7 @@ class MultiLayerPerceptron(nn.Module):
                  activation_function = torch.relu,
                  bias: bool = False,
                  init_zeroes: bool = False,
+                 distinguish_gloss_context_embeddings: bool = False,
                  **kwargs):
         """
         multi-layer dense neural network with artibrary activation function
@@ -39,9 +40,18 @@ class MultiLayerPerceptron(nn.Module):
         self._n_hidden = n_layer
         self._n_dim_out = n_dim_out
         self._bias = bias
+        self._distinguish_gloss_context_embeddings = distinguish_gloss_context_embeddings
         self._lst_dense = []
+        if distinguish_gloss_context_embeddings:
+            embedding_dim = kwargs.get("embedding_dim", None)
+            embedding_dim = int(n_dim_in//8) if embedding_dim is None else embedding_dim
+            self._embedding = nn.Embedding(num_embeddings=2, embedding_dim=embedding_dim)
+        else:
+            self._embedding = None
+            embedding_dim = 0
+
         for k in range(n_layer):
-            n_in = n_dim_in if k==0 else n_dim_hidden
+            n_in = n_dim_in+embedding_dim if k==0 else n_dim_hidden
             n_out = n_dim_out if k==(n_layer - 1) else n_dim_hidden
             dense_layer = nn.Linear(n_in, n_out, bias=bias)
             if init_zeroes:
@@ -50,7 +60,17 @@ class MultiLayerPerceptron(nn.Module):
         self._activation = activation_function
         self._layers = nn.ModuleList(self._lst_dense)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor, is_gloss_embeddings: bool = None):
+
+        if self._distinguish_gloss_context_embeddings:
+            # concat gloss_or_context embedding.
+            assert is_gloss_embeddings is not None, f"argument `is_gloss_embeddings` must be specified because `distinguish_gloss_context_embeddings=True`"
+            idx = int(is_gloss_embeddings)
+            # shape = (n_batch, (n_sample), 1)
+            shape = x.shape[:-1] + (1,)
+            t_e = self._embedding(torch.tensor(idx).to(x.device))
+            t_e = torch.tile(t_e, shape)
+            x = torch.cat([x, t_e], dim=-1)
 
         for k, dense in enumerate(self._layers):
             if k == 0:
@@ -62,9 +82,9 @@ class MultiLayerPerceptron(nn.Module):
 
         return h
 
-    def predict(self, x):
+    def predict(self, x, is_gloss_embeddings: bool = None):
         with torch.no_grad():
-            return self.forward(x)
+            return self.forward(x, is_gloss_embeddings)
 
     def verbose(self):
         return {}
@@ -79,7 +99,9 @@ class NormRestrictedShift(nn.Module):
                  max_l2_norm_value: Optional[float] = None,
                  max_l2_norm_ratio: Optional[float] = None,
                  init_zeroes: bool = False,
-                 bias: bool = False, **kwargs):
+                 bias: bool = False,
+                 distinguish_gloss_context_embeddings: bool = False,
+                 **kwargs):
         """
         this module shifts input vector up to max L2 norm.
         let x as input, d as number of dimensions, \sigma as sigmoid function, F(x) as the multi-layer perceptron, output will be written as follows.
@@ -98,12 +120,14 @@ class NormRestrictedShift(nn.Module):
         assert (max_l2_norm_value is not None) or (max_l2_norm_ratio is not None), f"either `max_l2_norm_value` or `max_l2_norm_ratio` must be specified."
         assert (max_l2_norm_value is None) or (max_l2_norm_ratio is None), f"you can't specify both `max_l2_norm_value` and `max_l2_norm_ratio` simultaneously."
 
-        self._ffn = MultiLayerPerceptron(n_dim_in=n_dim_in, n_dim_out=n_dim_in, n_dim_hidden=n_dim_hidden, n_layer=n_layer, activation_function=activation_function, bias=bias, init_zeroes=init_zeroes)
+        self._ffn = MultiLayerPerceptron(n_dim_in=n_dim_in, n_dim_out=n_dim_in, n_dim_hidden=n_dim_hidden, n_layer=n_layer,
+                                         activation_function=activation_function, bias=bias, init_zeroes=init_zeroes,
+                                         distinguish_gloss_context_embeddings=distinguish_gloss_context_embeddings)
         self._max_l2_norm_value = max_l2_norm_value
         self._max_l2_norm_ratio = max_l2_norm_ratio
 
-    def forward(self, x):
-        z = self._ffn.forward(x)
+    def forward(self, x, is_gloss_embeddings: bool = None):
+        z = self._ffn.forward(x, is_gloss_embeddings)
         # transform to [-1, 1]
         # NOTE: shoud we replace with tanh?
         dx = 2. * torch.sigmoid(z) - 1.
@@ -118,9 +142,9 @@ class NormRestrictedShift(nn.Module):
 
         return y
 
-    def predict(self, x):
+    def predict(self, x, is_gloss_embeddings: bool = None):
         with torch.no_grad():
-            return self.forward(x)
+            return self.forward(x, is_gloss_embeddings)
 
 
 class Identity(nn.Module):
@@ -140,9 +164,9 @@ class Identity(nn.Module):
         if assign_dummy_parameter:
             self.dummy = nn.Parameter(torch.zeros((1,)), requires_grad=False)
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         return x
 
-    def predict(self, x):
+    def predict(self, x, **kwargs):
         with torch.no_grad():
             return self.forward(x)
