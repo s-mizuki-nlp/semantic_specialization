@@ -59,26 +59,30 @@ def objective(trial: optuna.Trial):
         "use_taxonomy_distance_for_sampling_positives": trial.suggest_categorical("use_taxonomy_distance_for_sampling_positives", [True,False]),
         "num_hard_negatives": trial.suggest_categorical("num_hard_negatives", [-1, 0, 1, 3, 5, 7, 9]) # 負例に用いる同形異義語の数．-1:無制限，0:なし，N(>0):N個まで
     }
-    dict_args["use_positives_as_in_batch_negatives"] = True
+    dict_args["use_positives_as_in_batch_negatives"] = trial.suggest_categorical("use_positives_as_in_batch_negatives", [True, False])
     dict_args["cfg_contrastive_learning_dataset"] = cfg_contrastive_learning_dataset
+    # we don't accept no negative example configuration.
+    if cfg_contrastive_learning_dataset["use_taxonomy_distance_for_sampling_positives"] == 0:
+        if dict_args["use_positives_as_in_batch_negatives"] == False:
+            return 0.0
 
     # max-pool margin task に関する条件付け．
-    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.01, high=1.0)
+    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.001, high=1.0)
     max_margin = trial.suggest_discrete_uniform("max_margin", low=0.3, high=0.9, q=0.1)
     top_k = trial.suggest_int("top_k", low=1, high=7)
     dict_args["cfg_max_pool_margin_loss"] = {"max_margin": max_margin, "top_k": top_k}
 
     # gloss/context projection head
     gloss_projection_head_name = "NormRestrictedShift"
-    context_projection_head_name = "SHARED"
+    context_projection_head_name = trial.suggest_categorical("context_projection_head_name", ["SHARED", "Identity"])
     dict_args["gloss_projection_head_name"] = gloss_projection_head_name
     dict_args["context_projection_head_name"] = context_projection_head_name
 
     # gloss projection head configuration
     cfg_gloss_projection_head = {}
-    cfg_gloss_projection_head["n_layer"] = trial.suggest_int("n_layer", low=1, high=3, step=1)
+    cfg_gloss_projection_head["n_layer"] = trial.suggest_int("n_layer", low=1, high=4, step=1)
     if gloss_projection_head_name == "NormRestrictedShift":
-        cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.01, high=0.3)
+        cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.001, high=0.3)
         cfg_gloss_projection_head["init_zeroes"] = True
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
 
