@@ -62,7 +62,7 @@ def objective(trial: optuna.Trial):
     dict_args["use_positives_as_in_batch_negatives"] = trial.suggest_categorical("use_positives_as_in_batch_negatives", [True, False])
     dict_args["cfg_contrastive_learning_dataset"] = cfg_contrastive_learning_dataset
     # we don't accept no negative example configuration.
-    if cfg_contrastive_learning_dataset["use_taxonomy_distance_for_sampling_positives"] == 0:
+    if cfg_contrastive_learning_dataset["num_hard_negatives"] == 0:
         if dict_args["use_positives_as_in_batch_negatives"] == False:
             return 0.0
 
