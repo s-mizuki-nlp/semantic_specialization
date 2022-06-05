@@ -3,6 +3,7 @@
 
 import os, sys, io
 import json
+import math
 import argparse
 from pprint import pprint
 
@@ -45,12 +46,9 @@ def objective(trial: optuna.Trial):
     similarity_class_name = "CosineSimilarity"
 
     # optimization
-    batch_size = trial.suggest_categorical("batch_size", [32,64,128,256])
+    batch_size = trial.suggest_categorical("batch_size", [32,64,128,1024,2048])
     dict_args["val_check_interval"] = int(1000 * 128 / batch_size)
-    if batch_size == 256:
-        dict_args["max_epochs"] = 15
-    elif batch_size == 512:
-        dict_args["max_epochs"] = 20
+    dict_args["max_epochs"] = min(20, max(10, int(10 * math.sqrt(batch_size / 128))))
     dict_args["batch_size"] = batch_size
 
     # contrastive task に関する条件付け
@@ -74,7 +72,7 @@ def objective(trial: optuna.Trial):
 
     # gloss/context projection head
     gloss_projection_head_name = "NormRestrictedShift"
-    context_projection_head_name = trial.suggest_categorical("context_projection_head_name", ["SHARED", "Identity"])
+    context_projection_head_name = "SHARED"
     dict_args["gloss_projection_head_name"] = gloss_projection_head_name
     dict_args["context_projection_head_name"] = context_projection_head_name
 
