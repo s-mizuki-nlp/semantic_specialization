@@ -39,7 +39,7 @@ def objective(trial: optuna.Trial):
     }
 
     # always enable max-pool margin task
-    context_dataset_name = trial.suggest_categorical("context_dataset_name", ["SemCor-bert-large-cased", "SemCor+OMSTI-bert-large-cased"])
+    context_dataset_name = "SemCor+OMSTI-bert-large-cased"
 
     # always use cosine similarity module
     similarity_class_name = "CosineSimilarity"
