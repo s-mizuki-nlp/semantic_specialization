@@ -59,7 +59,7 @@ def objective(trial: optuna.Trial):
         "use_taxonomy_distance_for_sampling_positives": False,
         "num_hard_negatives": trial.suggest_categorical("num_hard_negatives", [-1, 0, 1, 3, 5, 7, 9]) # 負例に用いる同形異義語の数．-1:無制限，0:なし，N(>0):N個まで
     }
-    dict_args["use_positives_as_in_batch_negatives"] = trial.suggest_categorical("use_positives_as_in_batch_negatives", [True, False])
+    dict_args["use_positives_as_in_batch_negatives"] = True
     dict_args["cfg_contrastive_learning_dataset"] = cfg_contrastive_learning_dataset
     # we don't accept no negative example configuration.
     if cfg_contrastive_learning_dataset["num_hard_negatives"] == 0:
