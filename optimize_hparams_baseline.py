@@ -46,12 +46,10 @@ def objective(trial: optuna.Trial):
     similarity_class_name = "CosineSimilarity"
 
     # optimization
-    batch_size = trial.suggest_categorical("batch_size", [32,64,128,1024,2048])
+    batch_size = 2048
     dict_args["val_check_interval"] = int(1000 * 128 / batch_size)
     dict_args["max_epochs"] = min(20, max(10, int(10 * math.sqrt(batch_size / 128))))
     dict_args["batch_size"] = batch_size
-    if batch_size != 2018:
-        return 0.0
 
     # contrastive task に関する条件付け
     cfg_contrastive_learning_dataset = {
