@@ -150,7 +150,7 @@ class FrequencyBasedMonosemousEntitySampler(object):
             elif dataset_monosemous_entity_annotated_corpus is not None:
                 print("counting lemma x pos frequency from dataset.")
                 self._lemma_pos_freq = self._count_lemma_pos_freq(dataset=dataset_monosemous_entity_annotated_corpus,
-                                                                  lemma_lowercase=lemma_lowercase)
+                                                                  lemma_lowercase=lemma_lowercase, entity_field_name=entity_field_name)
             else:
                 raise AssertionError(f"you must specify either `path_monosemous_words_freq` or `dataset_monosemous_entity_annotated_corpus`.")
         else:
@@ -182,10 +182,10 @@ class FrequencyBasedMonosemousEntitySampler(object):
         return dict_freq
 
     @classmethod
-    def _count_lemma_pos_freq(cls, dataset: Dataset, lemma_lowercase: bool):
+    def _count_lemma_pos_freq(cls, dataset: Dataset, lemma_lowercase: bool, entity_field_name: str):
         cnt = Counter()
         for record in dataset:
-            lst_lemma_pos = [lemma_pos_to_tuple(lemma_lowercase=lemma_lowercase, **entity) for entity in record[self._entity_field_name]]
+            lst_lemma_pos = [lemma_pos_to_tuple(lemma_lowercase=lemma_lowercase, **entity) for entity in record[entity_field_name]]
             cnt.update(lst_lemma_pos)
 
         return cnt
