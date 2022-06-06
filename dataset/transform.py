@@ -129,6 +129,7 @@ class FrequencyBasedMonosemousEntitySampler(object):
                  dataset_monosemous_entity_annotated_corpus: Optional[Dataset] = None,
                  lemma_lowercase: bool = True,
                  enable_random_sampling: bool = True,
+                 entity_field_name: str = "entities",
                  random_seed: int = 42
                  ):
         """
@@ -160,6 +161,7 @@ class FrequencyBasedMonosemousEntitySampler(object):
         self._max_freq = float("inf") if max_freq is None else max_freq
         self._lemma_lowercase = lemma_lowercase
         self._enable_random_sampling = enable_random_sampling
+        self._entity_field_name = entity_field_name
 
         if enable_random_sampling:
             np.random.seed(random_seed)
@@ -183,7 +185,7 @@ class FrequencyBasedMonosemousEntitySampler(object):
     def _count_lemma_pos_freq(cls, dataset: Dataset, lemma_lowercase: bool):
         cnt = Counter()
         for record in dataset:
-            lst_lemma_pos = [lemma_pos_to_tuple(lemma_lowercase=lemma_lowercase, **entity) for entity in record["monosemous_entities"]]
+            lst_lemma_pos = [lemma_pos_to_tuple(lemma_lowercase=lemma_lowercase, **entity) for entity in record[self._entity_field_name]]
             cnt.update(lst_lemma_pos)
 
         return cnt
