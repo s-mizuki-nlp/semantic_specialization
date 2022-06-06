@@ -46,7 +46,7 @@ def objective(trial: optuna.Trial):
     similarity_class_name = "CosineSimilarity"
 
     # optimization
-    batch_size = 2048
+    batch_size = 1536
     dict_args["val_check_interval"] = int(1000 * 128 / batch_size)
     dict_args["max_epochs"] = min(20, max(10, int(10 * math.sqrt(batch_size / 128))))
     dict_args["batch_size"] = batch_size
