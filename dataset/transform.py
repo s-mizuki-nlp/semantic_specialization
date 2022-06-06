@@ -41,24 +41,33 @@ class ToWordNetPoSTagConverter(object):
 
     def __init__(self, pos_field_name: str = "pos",
                  mwe_pos_field_name: str = "mwe_pos",
-                 convert_adjective_to_adjective_satellite: bool = True):
+                 convert_adjective_to_adjective_satellite: bool = True,
+                 keep_original_pos: bool = False):
 
         self._pos_field_name = pos_field_name
         self._mwe_pos_field_name = mwe_pos_field_name
         self._convert_adjective_to_adjective_satellite = convert_adjective_to_adjective_satellite
+        self._keep_original_pos = keep_original_pos
+        self._pos_orig_field_name = pos_field_name + "_orig"
+        self._mwe_pos_orig_field_name = mwe_pos_field_name + "_orig"
 
     def _adjective_to_adjective_satellite(self, pos):
         return "s" if pos == "a" else pos
 
     def __call__(self, lst_tokens):
         # Stanford token PoS tags to WordNet PoS tags.
+
         for token in lst_tokens:
+            if self._keep_original_pos:
+                token[self._pos_orig_field_name] = token[self._pos_field_name]
             pos = utils_wordnet.ptb_tagset_to_wordnet_tagset(token[self._pos_field_name])
             if self._convert_adjective_to_adjective_satellite:
                 pos = self._adjective_to_adjective_satellite(pos)
             token[self._pos_field_name] = pos
 
             if self._mwe_pos_field_name in token:
+                if self._keep_original_pos:
+                    token[self._mwe_pos_orig_field_name] = token[self._mwe_pos_field_name]
                 pos = utils_wordnet.jmwe_tagset_to_wordnet_tagset(token[self._mwe_pos_field_name])
                 if self._convert_adjective_to_adjective_satellite:
                     pos = self._adjective_to_adjective_satellite(pos)
@@ -76,14 +85,16 @@ class ToWordNetPoSTagAndLemmaConverter(ToWordNetPoSTagConverter):
                  lemma_and_pos_field_name: str = "lemma_pos",
                  mwe_lemma_and_pos_field_name: str = "mwe_lemma_pos",
                  convert_adjective_to_adjective_satellite: bool = True,
+                 keep_original_pos: bool = False,
                  lowercase: bool = True):
 
-        super().__init__(pos_field_name, mwe_pos_field_name, convert_adjective_to_adjective_satellite)
+        super().__init__(pos_field_name, mwe_pos_field_name, convert_adjective_to_adjective_satellite, keep_original_pos)
         self._lemma_field_name = lemma_field_name
         self._mwe_lemma_field_name = mwe_lemma_field_name
         self._lemma_and_pos_field_name = lemma_and_pos_field_name
         self._mwe_lemma_and_pos_field_name = mwe_lemma_and_pos_field_name
         self._lowercase = lowercase
+        self._keep_original_pos = keep_original_pos
 
     def __call__(self, lst_tokens):
         lst_tokens = super().__call__(lst_tokens)
