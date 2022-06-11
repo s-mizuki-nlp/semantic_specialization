@@ -247,8 +247,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         if context_dataset_name in sense_annotated_corpus.cfg_training:
             context_dataset = BERTEmbeddingsDataset(**sense_annotated_corpus.cfg_training[context_dataset_name])
             max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=context_dataset, **cfg_task_dataset["WSD"])
-        elif context_dataset_name in monosemous_corpus.cfg_training:
-            context_dataset = BERTEmbeddingsDataset(**monosemous_corpus.cfg_training[context_dataset_name])
+        elif context_dataset_name in monosemous_corpus.cfg_embeddings:
+            context_dataset = BERTEmbeddingsDataset(**monosemous_corpus.cfg_embeddings[context_dataset_name])
             max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=context_dataset, **cfg_task_dataset["TrainOnMonosemousCorpus"])
         else:
             raise ValueError(f"invalid context dataset name: {context_dataset_name}")
