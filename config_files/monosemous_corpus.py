@@ -39,5 +39,14 @@ cfg_embeddings = {
         "padding": False,
         "max_sequence_length": None,
         "description": "BERT-large-cased. Wikitext-103 trainset, min_freq=1, max_sample=10, length=6~128."
+    },
+    "monosemous_wiki40b-all_10-10": {
+        "path":pick_first_available_path(
+            os.path.join(DIR_LOCAL, "bert-large-cased_monosemous_wiki40b_all_freq=10-10_len=6-128_random=True.hdf5"),
+            os.path.join(DIR_EMBEDDINGS, "bert-large-cased_monosemous_wiki40b_all_freq=10-10_len=6-128_random=True.hdf5"),
+        ),
+        "padding": False,
+        "max_sequence_length": None,
+        "description": "BERT-large-cased. wiki40b trainset(all), min_freq=10, max_sample=10, length=6~128."
     }
 }
