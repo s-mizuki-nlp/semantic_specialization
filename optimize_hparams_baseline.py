@@ -34,19 +34,19 @@ def objective(trial: optuna.Trial):
         "gpus": gpu_id,
         "name": env_name,
         "gloss_dataset_name": "SREF_basic_lemma_embeddings",
-        "max_epochs": 10,
+        "max_epochs": 15,
         "log_every_n_steps": 500,
         "shuffle": True
     }
 
     # always enable max-pool margin task
-    context_dataset_name = "SemCor+OMSTI-bert-large-cased"
+    context_dataset_name = "SemCor-bert-large-cased"
 
     # always use cosine similarity module
     similarity_class_name = "CosineSimilarity"
 
     # optimization
-    batch_size = trial.suggest_categorical("batch_size", [32,64,128,1024,2048])
+    batch_size = 256
     dict_args["val_check_interval"] = int(1000 * 128 / batch_size)
     dict_args["max_epochs"] = min(20, max(10, int(10 * math.sqrt(batch_size / 128))))
     dict_args["batch_size"] = batch_size
@@ -82,7 +82,7 @@ def objective(trial: optuna.Trial):
     if gloss_projection_head_name == "NormRestrictedShift":
         cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.001, high=0.1)
         cfg_gloss_projection_head["init_zeroes"] = True
-        cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = trial.suggest_categorical("distinguish_gloss_context_embeddings", [True, False])
+        cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
 
     # distinguish_gloss_context_embeddings is effective for "SHARED" setting.
