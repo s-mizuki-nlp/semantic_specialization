@@ -44,7 +44,7 @@ import platform
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Subset, ChainDataset
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -133,7 +133,7 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--eval_dataset_name", required=False, type=str, default="WSDEval-ALL-bert-large-cased", help="Evaluation dataset name.")
     parser.add_argument("--dev_dataset_task_name", required=False, type=str, default="WSD-SemEval2007", help="Development dataset task name.")
     parser.add_argument("--gloss_dataset_name", required=False, type=str, default="SREF_basic_lemma_embeddings", help="Gloss embeddings dataset name.")
-    parser.add_argument("--context_dataset_name", required=False, type=nullable_string, default=None, help="Context embeddings dataset name. Specifying it enables max-pooling margin task.")
+    parser.add_argument("--context_dataset_name", required=False, type=nullable_string, default=None, help="Context embeddings dataset name(s). Multiple names with comma delimiter can be specified. Specifying it enables max-pooling margin task.")
     parser.add_argument("--coef_max_pool_margin_loss", required=False, type=float, default=1.0, help="Coefficient of max-pooling margin task.")
     parser.add_argument("--sense_annotated_dataset_name", required=False, type=nullable_string, default=None, help="Sense-annotated corpus embeddings dataset name. Specifying it enables supervised alignment task.")
     parser.add_argument("--coef_supervised_alignment_loss", required=False, type=float, default=1.0, help="Coefficient of supervised alignment task.")
@@ -244,18 +244,30 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
     elif context_dataset_name == "":
         max_pool_margin_dataset = None
     else:
-        if context_dataset_name in sense_annotated_corpus.cfg_training:
-            context_dataset = BERTEmbeddingsDataset(**sense_annotated_corpus.cfg_training[context_dataset_name])
-            max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=context_dataset, **cfg_task_dataset["WSD"])
-        elif context_dataset_name in monosemous_corpus.cfg_embeddings:
-            context_dataset = BERTEmbeddingsDataset(**monosemous_corpus.cfg_embeddings[context_dataset_name])
-            max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=context_dataset, **cfg_task_dataset["TrainOnMonosemousCorpus"])
+        lst_max_pool_margin_datasets = []
+        for _context_dataset_name in context_dataset_name.split(","):
+            if _context_dataset_name in sense_annotated_corpus.cfg_training:
+                _context_dataset = BERTEmbeddingsDataset(**sense_annotated_corpus.cfg_training[_context_dataset_name])
+                _max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=_context_dataset, **cfg_task_dataset["WSD"])
+            elif _context_dataset_name in monosemous_corpus.cfg_embeddings:
+                _context_dataset = BERTEmbeddingsDataset(**monosemous_corpus.cfg_embeddings[_context_dataset_name])
+                _max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=_context_dataset, **cfg_task_dataset["TrainOnMonosemousCorpus"])
+            else:
+                raise ValueError(f"invalid context dataset name: {context_dataset_name}")
+            lst_max_pool_margin_datasets.append(_max_pool_margin_dataset)
+        if len(lst_max_pool_margin_datasets) == 1:
+            max_pool_margin_dataset = lst_max_pool_margin_datasets[0]
         else:
-            raise ValueError(f"invalid context dataset name: {context_dataset_name}")
+            max_pool_margin_dataset = ChainDataset(lst_max_pool_margin_datasets)
+
     if max_pool_margin_dataset is not None:
         if verbose:
             pprint("=== maximum margin task dataset ===")
-            pprint(max_pool_margin_dataset.verbose)
+            if isinstance(max_pool_margin_dataset, ChainDataset):
+                for _dataset in max_pool_margin_dataset.datasets:
+                    pprint(_dataset.verbose)
+            else:
+                pprint(max_pool_margin_dataset.verbose)
 
     ## (optional) BERT Embeddings Dataset for Supervised Alignment Task
     ## 事実上SemCor一択．
