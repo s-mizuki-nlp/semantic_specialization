@@ -40,7 +40,7 @@ def objective(trial: optuna.Trial):
     }
 
     # always enable max-pool margin task
-    context_dataset_name = "monosemous_wiki40b-all_10-10"
+    context_dataset_name = "monosemous_wiki40b-all_10-10,SemCor-bert-large-cased"
 
     # always use cosine similarity module
     similarity_class_name = "CosineSimilarity"
@@ -65,7 +65,7 @@ def objective(trial: optuna.Trial):
             return 0.0
 
     # max-pool margin task に関する条件付け．
-    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.01, high=5.0)
+    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.05, high=10.0)
     max_margin = trial.suggest_discrete_uniform("max_margin", low=0.5, high=1.0, q=0.1)
     top_k = 1
     dict_args["cfg_max_pool_margin_loss"] = {"max_margin": max_margin, "top_k": top_k}
@@ -80,7 +80,7 @@ def objective(trial: optuna.Trial):
     cfg_gloss_projection_head = {}
     cfg_gloss_projection_head["n_layer"] = 2
     if gloss_projection_head_name == "NormRestrictedShift":
-        cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.001, high=0.1)
+        cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.005, high=0.1)
         cfg_gloss_projection_head["init_zeroes"] = True
         cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
@@ -90,7 +90,7 @@ def objective(trial: optuna.Trial):
 
     # similarity module
     cfg_similarity_class = {
-        "temperature": trial.suggest_loguniform("temperature", low=0.01, high=1.0)
+        "temperature": trial.suggest_loguniform("temperature", low=0.01, high=0.1)
     }
     dict_args["cfg_similarity_class"] = cfg_similarity_class
     dict_args["similarity_class_name"] = similarity_class_name
