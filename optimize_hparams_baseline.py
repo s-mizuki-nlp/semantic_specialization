@@ -34,7 +34,7 @@ def objective(trial: optuna.Trial):
         "gpus": gpu_id,
         "name": env_name,
         "gloss_dataset_name": "SREF_basic_lemma_embeddings_without_augmentation",
-        "eval_dataset_name": "WSD-SemEval2007",
+        "eval_dataset_task_name": "WSD-SemEval2007",
         "max_epochs": 15,
         "log_every_n_steps": 500,
         "shuffle": True

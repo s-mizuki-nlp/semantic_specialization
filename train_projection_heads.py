@@ -131,6 +131,7 @@ def _parse_args(exclude_required_arguments: bool = False):
 
     parser = argparse.ArgumentParser(description="trainer for {gloss,context} projection heads using BERT embeddings.")
     parser.add_argument("--eval_dataset_name", required=False, type=str, default="WSDEval-ALL-bert-large-cased", help="Evaluation dataset name.")
+    parser.add_argument("--eval_dataset_task_name", required=False, type=str, default="WSD", choices=["WSD", "WSD-SemEval2007"], help="Evaluation dataset task name.")
     parser.add_argument("--dev_dataset_task_name", required=False, type=str, default="WSD-SemEval2007", help="Development dataset task name.")
     parser.add_argument("--gloss_dataset_name", required=False, type=str, default="SREF_basic_lemma_embeddings", help="Gloss embeddings dataset name.")
     parser.add_argument("--context_dataset_name", required=False, type=nullable_string, default=None, help="Context embeddings dataset name(s). Multiple names with comma delimiter can be specified. Specifying it enables max-pooling margin task.")
@@ -157,7 +158,6 @@ def _parse_args(exclude_required_arguments: bool = False):
         parser.add_argument("--gloss_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity"], help="gloss projection head class name.")
         parser.add_argument("--context_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity", "COPY", "SHARED"],
                             help="context projection head class name. SHARED: share with gloss projection head. COPY: copy initial model parameter from gloss projection head.")
-
 
     lst_config_names = ("cfg_contrastive_learning_dataset", "cfg_gloss_projection_head", "cfg_context_projection_head", "cfg_similarity_class",
                         "cfg_max_pool_margin_loss", "cfg_optimizer", "cfg_trainer")
@@ -218,7 +218,7 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
     evalset_embeddings_name = args.eval_dataset_name
     evalset_embeddings = BERTEmbeddingsDataset(**sense_annotated_corpus.cfg_evaluation[evalset_embeddings_name])
 
-    eval_dataset = WSDTaskDataset(bert_embeddings_dataset=evalset_embeddings, **cfg_task_dataset["WSD"])
+    eval_dataset = WSDTaskDataset(bert_embeddings_dataset=evalset_embeddings, **cfg_task_dataset[args.eval_dataset_task_name])
     dev_dataset = WSDTaskDataset(bert_embeddings_dataset=evalset_embeddings, **cfg_task_dataset[args.dev_dataset_task_name])
 
     ## Gloss (Embeddings) Dataset
