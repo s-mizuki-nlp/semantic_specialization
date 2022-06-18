@@ -33,7 +33,8 @@ def objective(trial: optuna.Trial):
     dict_args = {
         "gpus": gpu_id,
         "name": env_name,
-        "gloss_dataset_name": "SREF_basic_lemma_embeddings",
+        "gloss_dataset_name": "SREF_basic_lemma_embeddings_without_augmentation",
+        "eval_dataset_name": "WSD-SemEval2007",
         "max_epochs": 15,
         "log_every_n_steps": 500,
         "shuffle": True
@@ -48,7 +49,7 @@ def objective(trial: optuna.Trial):
     # optimization
     batch_size = 256
     dict_args["val_check_interval"] = int(1000 * 128 / batch_size)
-    dict_args["max_epochs"] = min(20, max(10, int(10 * math.sqrt(batch_size / 128))))
+    dict_args["max_epochs"] = min(20, max(dict_args["max_epochs"], int(10 * math.sqrt(batch_size / 128))))
     dict_args["batch_size"] = batch_size
 
     # contrastive task に関する条件付け
@@ -65,8 +66,8 @@ def objective(trial: optuna.Trial):
             return 0.0
 
     # max-pool margin task に関する条件付け．
-    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.01, high=5.0)
-    max_margin = trial.suggest_discrete_uniform("max_margin", low=0.5, high=1.0, q=0.1)
+    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.1, high=1.0)
+    max_margin = 1.0 # trial.suggest_discrete_uniform("max_margin", low=0.5, high=1.0, q=0.1)
     top_k = trial.suggest_int("top_k", low=1, high=7)
     dict_args["cfg_max_pool_margin_loss"] = {"max_margin": max_margin, "top_k": top_k}
 
@@ -82,7 +83,7 @@ def objective(trial: optuna.Trial):
     if gloss_projection_head_name == "NormRestrictedShift":
         cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.001, high=0.1)
         cfg_gloss_projection_head["init_zeroes"] = True
-        cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
+        cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = trial.suggest_categorical("distinguish_gloss_context_embeddings", [True, False])
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
 
     # distinguish_gloss_context_embeddings is effective for "SHARED" setting.
@@ -95,7 +96,7 @@ def objective(trial: optuna.Trial):
 
     # similarity module
     cfg_similarity_class = {
-        "temperature": trial.suggest_loguniform("temperature", low=0.01, high=1.0)
+        "temperature": 1/64,
     }
     dict_args["cfg_similarity_class"] = cfg_similarity_class
     dict_args["similarity_class_name"] = similarity_class_name
