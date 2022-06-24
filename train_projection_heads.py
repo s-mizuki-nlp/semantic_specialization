@@ -154,6 +154,7 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--num_workers", required=False, type=int, default=0, help="Not available yet.")
     parser.add_argument("--name", required=False, type=str, default=None, help=f"name of the model checkpoints. if no specified, {PLATFORM_NAME}")
     parser.add_argument("--version", required=False, type=nullable_string, default=None, help="model checkpoint version. if no specified, auto increment.")
+    parser.add_argument("--save_eval_metrics", required=False, type=nullable_string, default=None, help="save evaluation metrics to specified path with json format. if exists, appended.")
     if not exclude_required_arguments:
         parser.add_argument("--gloss_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity"], help="gloss projection head class name.")
         parser.add_argument("--context_projection_head_name", required=True, type=str, choices=["MultiLayerPerceptron", "NormRestrictedShift", "Identity", "COPY", "SHARED"],
@@ -426,13 +427,23 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
                        )
     print(f"checkpoint will be saved: {logger.log_dir}")
 
-    system.validate(model, dataloaders=val_data_loader)
+    _ = system.validate(model, dataloaders=val_data_loader)
     system.fit(model,
                train_dataloaders=train_data_loader,
                val_dataloaders=val_data_loader
                )
 
     print(f"finished: {PLATFORM_NAME}/version_{args.version}")
+
+    path_save = args.save_eval_metrics
+    if path_save is not None:
+        mode = "a" if os.path.exists(path_save) else "w"
+        tensor_to_item = lambda v: v.item() if torch.is_tensor(v) else v
+        dict_metrics = {key: tensor_to_item(value) for key, value in system.logged_metrics.items()}
+        dict_metrics["checkpoint"] = f"{platform}/version_{logger.version}"
+        with io.open(path_save, mode=mode) as ofs:
+            json.dump(dict_metrics, ofs)
+            ofs.write("\n")
 
     if returned_metric is not None:
         return system.logged_metrics[returned_metric]
