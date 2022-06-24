@@ -278,8 +278,9 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         return loss
 
     def on_train_start(self) -> None:
-        init_metrics = {metric_name:0.0 for metric_name in self.metrics.keys()}
-        self.logger.log_hyperparams(params=self.hparams, metrics=init_metrics)
+        # init_metrics = {metric_name:0.0 for metric_name in self.metrics.keys()}
+        # self.logger.log_hyperparams(params=self.hparams, metrics=init_metrics)
+        pass
 
     def validation_step(self, batch: Dict[str, Dict[str, torch.Tensor]], batch_idx: int):
 
@@ -305,11 +306,14 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                                                                                 loss_function=self._contrastive_loss,
                                                                                 **_batch)
             _query = self._context_projection_head.forward(_batch["query"], is_gloss_embeddings=False)
-            _positive = self._gloss_projection_head.forward(_batch["positive"], is_gloss_embeddings=False)
-            _negatives = self._gloss_projection_head.forward(_batch["negatives"], is_gloss_embeddings=False)
+            _positive = self._gloss_projection_head.forward(_batch["positive"], is_gloss_embeddings=True)
+            _negatives = self._gloss_projection_head.forward(_batch["negatives"], is_gloss_embeddings=True)
 
+            # gloss_context_similarity: ground-truth (context, gloss) pairの類似度
             gloss_context_similarity = F.cosine_similarity(_query, _positive, dim=-1).mean()
 
+            # homograph_similarity: 語義が異なる gloss embeddings の類似度
+            # gloss embeddings = positive + negatives
             _homographs = torch.cat((_positive.unsqueeze(dim=1), _negatives), dim=1)
             _num_homographs = _batch["num_negatives"] + 1
             homograph_similarity = batch_pairwise_cosine_similarity(tensors=_homographs, num_samples=_num_homographs, reduction="mean")
@@ -360,6 +364,8 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         dict_eval_metrics["hp/wsd_eval_ALL"] = dict_metrics["ALL"]["f1_score_by_raganato"]
         for pos, _metrics in dict_metrics["pos_orig"].items():
             dict_eval_metrics[f"hp/wsd_eval_{pos}"] = _metrics["f1_score_by_raganato"]
+        for corpus_id, _metrics in dict_metrics["corpus_id"].items():
+            dict_eval_metrics[f"hp/wsd_eval_{corpus_id}"] = _metrics["f1_score_by_raganato"]
         self.log_dict(dict_eval_metrics, on_step=False, on_epoch=True)
         self.log("hp_metric", dict_eval_metrics["hp/wsd_eval_ALL"])
 
