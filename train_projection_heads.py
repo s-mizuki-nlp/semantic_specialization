@@ -371,6 +371,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         batch = next(iter(data_loader))
         print(f"{task_name}:{batch.keys()}")
 
+    train_data_loader = CombinedLoader(train_data_loaders, mode="min_size")
+
     ## validation dataloaders
     val_data_loaders = {}
 
@@ -387,6 +389,13 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
     for task_name, data_loader in val_data_loaders.items():
         batch = next(iter(data_loader))
         print(f"{task_name}:{batch.keys()}")
+
+    if len(val_data_loaders["supervised_alignment"]) <= len(val_data_loaders["contrastive"]):
+        mode = "min_size"
+    else:
+        mode = "max_size_cycle"
+    val_data_loader = CombinedLoader(val_data_loaders, mode=mode)
+
 
     ## training
     model = FrozenBERTWSDTaskTrainer(gloss_projection_head=gloss_projection_head,
@@ -417,9 +426,10 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
                        )
     print(f"checkpoint will be saved: {logger.log_dir}")
 
+    system.validate(model, dataloaders=val_data_loader)
     system.fit(model,
-               train_dataloaders=CombinedLoader(train_data_loaders, mode="min_size"),
-               val_dataloaders=CombinedLoader(val_data_loaders, mode="max_size_cycle")
+               train_dataloaders=train_data_loader,
+               val_dataloaders=val_data_loader
                )
 
     print(f"finished: {PLATFORM_NAME}/version_{args.version}")
