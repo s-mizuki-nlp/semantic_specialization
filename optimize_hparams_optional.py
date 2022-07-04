@@ -82,7 +82,7 @@ def objective(trial: optuna.Trial):
     cfg_gloss_projection_head = {}
     cfg_gloss_projection_head["n_layer"] = 2
     if gloss_projection_head_name == "NormRestrictedShift":
-        cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.001, high=0.1)
+        cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("gloss_max_l2_norm_ratio", low=0.001, high=0.1)
         cfg_gloss_projection_head["init_zeroes"] = True
         cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
@@ -91,7 +91,7 @@ def objective(trial: optuna.Trial):
     # optional_v3: apply different hyper-parameters
     cfg_context_projection_head = {}
     cfg_context_projection_head["n_layer"] = 2
-    cfg_context_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.001, high=0.1)
+    cfg_context_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("context_max_l2_norm_ratio", low=0.001, high=0.1)
     cfg_context_projection_head["init_zeroes"] = True
     cfg_context_projection_head["distinguish_gloss_context_embeddings"] = False
     dict_args["cfg_context_projection_head"] = cfg_context_projection_head
