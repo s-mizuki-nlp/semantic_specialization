@@ -8,6 +8,7 @@ import torch
 from nltk.corpus import wordnet as wn
 
 from .wsd_baseline import MostFrequentSenseWSDTaskEvaluator, numeric
+from .wsd_heuristics import TryAgainMechanism
 from dataset import WSDTaskDataset
 from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset
 from dataset.utils import tensor_to_numpy, numpy_to_tensor, batch_tile
@@ -22,6 +23,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
                  gloss_projection_head: torch.nn.Module,
                  context_projection_head: Optional[torch.nn.Module] = None,
                  target_pos: Tuple[str] = ("n","v","a","s","r"),
+                 try_again_mechanism: bool = False,
                  similarity_module: Union[str, torch.nn.Module] = "cosine",
                  evaluation_category: str = "lemma",
                  ground_truth_lemma_keys_field_name: str = "ground_truth_lemma_keys",
@@ -29,6 +31,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
                  breakdown_attributes: Optional[Iterable[Set[str]]] = None,
                  device: Optional[str] = "cpu",
                  verbose: bool = False,
+                 kwargs_try_again_mechanism: Optional[Dict] = None,
                  **kwargs_dataloader):
         super().__init__(
             evaluation_dataset=evaluation_dataset,
@@ -58,6 +61,27 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
                 raise ValueError(f"unknown `similarity_module` name: {similarity_module}")
         else:
             self._similarity_module = similarity_module
+
+        if try_again_mechanism:
+            if isinstance(kwargs_try_again_mechanism, dict):
+                _cfg = kwargs_try_again_mechanism
+            else:
+                _cfg = {
+                    "exclude_common_semantically_related_synsets": True,
+                    "lookup_first_lemma_sense_only": False,
+                    "average_similarity_in_synset": False,
+                    "exclude_oneselves_for_noun_and_verb": True,
+                    "do_not_fix_synset_degeneration_bug": False,
+                    "semantic_relation": "all-relations"
+                }
+            self._try_again_mechanism = TryAgainMechanism(lemma_key_embeddings_dataset=lemma_key_embeddings_dataset,
+                                                          gloss_projection_head=gloss_projection_head,
+                                                          similarity_module=similarity_module,
+                                                          device=device,
+                                                          verbose=verbose,
+                                                          **_cfg)
+        else:
+            self._try_again_mechanism = None
 
     def get_lemma_key_embedding(self, lemma_key: str) -> np.ndarray:
         """
@@ -114,7 +138,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
 
         # query embedding:
         # shape: (1, n_dim) if entity_embedding_field_name = "entity_span_avg_vectors"
-        # shape: (1, n_subwords, n_dim) if entity_embedding_field_name = "entity_span_avg_vectors"
+        # shape: (1, n_subwords, n_dim) if entity_embedding_field_name = "entities"
         t_query_embedding = input[self._entity_embedding_field_name]
         if t_query_embedding.ndim == 3:
             # average along subword dimension (=2nd dimension)
@@ -129,6 +153,14 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
         # calculate similarity
         t_sim_score = self._similarity_module(t_query_embeddings, t_candidate_lemma_key_embeddings)
         lst_metric_scores = tensor_to_numpy(t_sim_score).tolist()
+
+        # execute try-again mechanism
+        # it updates scores for top-2 most similar candidate lemmas. it never changes candidate order.
+        if self._try_again_mechanism is not None:
+            lst_candidate_lemmas, lst_metric_scores = self._try_again_mechanism.try_again_mechanism(t_query_embedding=t_query_embedding,
+                                                                                                    lst_candidate_lemma_keys=lst_candidate_lemma_keys,
+                                                                                                    lst_candidate_similarities=lst_metric_scores,
+                                                                                                    top_k_candidates=2)
 
         # return top-k lemma keys
         if ties_fallback_to_mfs:
