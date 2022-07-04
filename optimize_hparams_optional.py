@@ -56,7 +56,8 @@ def objective(trial: optuna.Trial):
     cfg_contrastive_learning_dataset = {
         "semantic_relation_for_positives": "all-relations",
         "use_taxonomy_distance_for_sampling_positives": False,
-        "num_hard_negatives": trial.suggest_categorical("num_hard_negatives", [-1, 0, 1, 3, 5, 7, 9]) # 負例に用いる同形異義語の数．-1:無制限，0:なし，N(>0):N個まで
+        # "num_hard_negatives": trial.suggest_categorical("num_hard_negatives", [-1, 0, 1, 3, 5, 7, 9]) # 負例に用いる同形異義語の数．-1:無制限，0:なし，N(>0):N個まで
+        "num_hard_negatives": 3
     }
     dict_args["use_positives_as_in_batch_negatives"] = True
     dict_args["cfg_contrastive_learning_dataset"] = cfg_contrastive_learning_dataset
@@ -73,7 +74,7 @@ def objective(trial: optuna.Trial):
 
     # gloss/context projection head
     gloss_projection_head_name = "NormRestrictedShift"
-    context_projection_head_name = "COPY"
+    context_projection_head_name = "NormRestrictedShift"
     dict_args["gloss_projection_head_name"] = gloss_projection_head_name
     dict_args["context_projection_head_name"] = context_projection_head_name
 
@@ -86,13 +87,14 @@ def objective(trial: optuna.Trial):
         cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
 
-    # distinguish_gloss_context_embeddings is effective for "SHARED" setting.
-    if context_projection_head_name in ("COPY","Identity"):
-        if cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] == True:
-            return 0.0
-
     # context projection head configuration
-    dict_args["cfg_context_projection_head"] = {}
+    # optional_v3: apply different hyper-parameters
+    cfg_context_projection_head = {}
+    cfg_context_projection_head["n_layer"] = 2
+    cfg_context_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.001, high=0.1)
+    cfg_context_projection_head["init_zeroes"] = True
+    cfg_context_projection_head["distinguish_gloss_context_embeddings"] = False
+    dict_args["cfg_context_projection_head"] = cfg_context_projection_head
 
     # similarity module
     cfg_similarity_class = {
