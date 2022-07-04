@@ -29,7 +29,6 @@ def lemma_to_surface(str_lemma: str):
     str_lemma = str_lemma.replace("_", " ")
     return str_lemma
 
-
 def get_sense_key_type(sensekey):
     return int(sensekey.split('%')[1].split(':')[0])
 
@@ -95,6 +94,9 @@ def lemma_key_to_lemma(lemma_key: str):
 def lemma_key_to_lexname(lemma_key: str):
     lemma = lemma_key_to_lemma(lemma_key)
     return lemma.synset().lexname()
+
+def synset_id_to_lexname(synset_id: str):
+    return wn.synset(synset_id).lexname()
 
 # instance-of lemmaを判定する関数
 def is_instance_of_lemma(str_lemma: str, pos: str):

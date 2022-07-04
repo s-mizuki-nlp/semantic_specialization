@@ -212,6 +212,7 @@ class SREFLemmaEmbeddingsDataset(Dataset):
         }
         return ret
 
+
 class BERTLemmaEmbeddingsDataset(SREFLemmaEmbeddingsDataset):
 
     _AVAILABLE_POOLING_METHOD = ("average", "cls", "entity")
