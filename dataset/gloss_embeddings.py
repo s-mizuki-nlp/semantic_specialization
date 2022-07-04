@@ -176,6 +176,28 @@ class SREFLemmaEmbeddingsDataset(Dataset):
     def get_lemma_keys(self):
         return list(self._index_by_lemma_key.keys())
 
+    def get_lemma_key_embedding(self, lemma_key: str) -> np.ndarray:
+        """
+        get lemma key embedding which is precomputed using WordNet gloss corpus.
+
+        Args:
+            lemma_key: lemma key.
+
+        Returns: lemma key embedding. shape: (n_dim, )
+
+        """
+        lst_records = self.get_records_by_lemma_key(lemma_key=lemma_key)
+        assert len(lst_records) == 1, f"record must be unique for each lemma key: {lemma_key}"
+        record = lst_records[0]
+        assert lemma_key in record["ground_truth_lemma_keys"], f"lemma key lookup failure: {lemma_key}"
+
+        return record["embeddings"]
+
+    def get_lemma_key_embeddings(self, lst_lemma_keys: List[str]) -> np.ndarray:
+        it = map(self.get_lemma_key_embedding, lst_lemma_keys)
+        v_embs = np.stack(list(it))
+        return v_embs
+
     @property
     def verbose(self):
         ret = {
