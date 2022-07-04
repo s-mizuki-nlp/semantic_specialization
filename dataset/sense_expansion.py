@@ -91,6 +91,7 @@ def morpho_extend(synset):
     lst_morpho_synsets += [lemma.synset() for lemma in lst_synonymy_lemmas]
     return lst_morpho_synsets
 
+@lru_cache(maxsize=int(1E6))
 def gloss_extend(o_sense, emb_strategy) -> List[wn.synset]:
     """
     note: this is the main algorithm for relation exploitation,
@@ -129,3 +130,11 @@ def gloss_extend(o_sense, emb_strategy) -> List[wn.synset]:
     extended_list += combine_list
 
     return extended_list
+
+@lru_cache(maxsize=100)
+def get_lexname_synsets(lexname: str) -> List[wn.synset]:
+    lst_synsets = []
+    for synset in wn.all_synsets():
+        if synset.lexname() == lexname:
+            lst_synsets.append(synset)
+    return lst_synsets
