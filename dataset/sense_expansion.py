@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Set
 from functools import lru_cache
 from nltk.corpus import wordnet as wn
 
@@ -132,9 +132,9 @@ def gloss_extend(o_sense, emb_strategy) -> List[wn.synset]:
     return extended_list
 
 @lru_cache(maxsize=100)
-def get_lexname_synsets(lexname: str) -> List[wn.synset]:
+def get_lexname_synsets(lexname: str) -> Set[wn.synset]:
     lst_synsets = []
     for synset in wn.all_synsets():
         if synset.lexname() == lexname:
             lst_synsets.append(synset)
-    return lst_synsets
+    return set(lst_synsets)

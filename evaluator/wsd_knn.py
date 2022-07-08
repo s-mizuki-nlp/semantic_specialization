@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
+import copy
 import warnings
 from typing import Dict, Any, Iterable, Optional, Set, Union, Tuple, List
+from pprint import pprint
 
 import numpy as np
 import torch
@@ -11,7 +13,8 @@ from .wsd_baseline import MostFrequentSenseWSDTaskEvaluator, numeric
 from .wsd_heuristics import TryAgainMechanism
 from dataset import WSDTaskDataset
 from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset
-from dataset.utils import tensor_to_numpy, numpy_to_tensor, batch_tile
+from dataset.utils import tensor_to_numpy, numpy_to_tensor
+from dataset_preprocessor import utils_wordnet_gloss
 from model.similarity import CosineSimilarity, DotProductSimilarity
 
 
@@ -54,7 +57,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
 
         if isinstance(similarity_module, str):
             if similarity_module == "cosine":
-                self._similarity_module = CosineSimilarity()
+                self._similarity_module = CosineSimilarity(temperature=1.0)
             elif similarity_module == "dot":
                 self._similarity_module = DotProductSimilarity()
             else:
@@ -76,7 +79,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
                 }
             self._try_again_mechanism = TryAgainMechanism(lemma_key_embeddings_dataset=lemma_key_embeddings_dataset,
                                                           gloss_projection_head=gloss_projection_head,
-                                                          similarity_module=similarity_module,
+                                                          similarity_module=self._similarity_module,
                                                           device=device,
                                                           verbose=verbose,
                                                           **_cfg)
@@ -157,10 +160,14 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
         # execute try-again mechanism
         # it updates scores for top-2 most similar candidate lemmas. it never changes candidate order.
         if self._try_again_mechanism is not None:
-            lst_candidate_lemmas, lst_metric_scores = self._try_again_mechanism.try_again_mechanism(t_query_embedding=t_query_embedding,
+            _lst_candidate_lemma_keys, lst_metric_scores = self._try_again_mechanism.try_again_mechanism(t_query_embedding=t_query_embedding,
+                                                                                                    pos=pos,
                                                                                                     lst_candidate_lemma_keys=lst_candidate_lemma_keys,
                                                                                                     lst_candidate_similarities=lst_metric_scores,
                                                                                                     top_k_candidates=2)
+            # DEBUG
+            # for lemma, lemma_key in zip(lst_candidate_lemmas, _lst_candidate_lemma_keys):
+            #     assert lemma.key() == lemma_key, f"order mismatch detected."
 
         # return top-k lemma keys
         if ties_fallback_to_mfs:

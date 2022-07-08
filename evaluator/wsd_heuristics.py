@@ -55,6 +55,7 @@ class TryAgainMechanism(object):
 
     def try_again_mechanism(self,
                             t_query_embedding: torch.Tensor,
+                            pos: str,
                             lst_candidate_lemma_keys: List[str],
                             lst_candidate_similarities: List[float],
                             top_k_candidates:int = 2,
@@ -103,16 +104,15 @@ class TryAgainMechanism(object):
         for candidate_synset_id in dict_candidate_synset_similarities.keys():
             # if supersense is different, then extend semantically related synsets with lexnames
             if is_different_lexname:
-                lexname = utils_wordnet_gloss.synset_id_to_lexname(synset_id)
-                dict_try_again_synsets[candidate_synset_id] |= set(get_lexname_synsets(lexname))
+                lexname = utils_wordnet_gloss.synset_id_to_lexname(candidate_synset_id)
+                dict_try_again_synsets[candidate_synset_id] |= get_lexname_synsets(lexname)
 
             # compute try-again similarity using semantically related synsets
             lst_try_again_similarities = []
             for try_again_synset in dict_try_again_synsets[candidate_synset_id]:
                 # exclude oneselves for NOUN and VERB
                 if self._exclude_oneselves_for_noun_and_verb:
-                    pos = utils_wordnet_gloss.lemma_key_to_pos(lemma_key, tagtype="short")
-                    if try_again_synset in dict_candidate_synset_similarities.keys() and (pos in ['n','v']):
+                    if try_again_synset.name() in dict_candidate_synset_similarities.keys() and (pos in ['n','v']):
                         continue
 
                 # calculate similarity between query and lemmas which belong to try-again synset.
@@ -141,5 +141,8 @@ class TryAgainMechanism(object):
             try_agian_similarity = dict_candidate_synset_similarities[synset_id]
             idx = lst_candidate_lemma_keys.index(lemma_key)
             lst_candidate_similarities[idx] = original_similarity + try_agian_similarity
+
+            # DEBUG
+            # print(f"{lemma_key}:{lst_candidate_similarities[idx]}")
 
         return lst_candidate_lemma_keys, lst_candidate_similarities
