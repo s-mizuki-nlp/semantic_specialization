@@ -11,11 +11,11 @@
 # * gloss embeddings, context embeddingsは計算済み．
 # 
 # ## 目的関数
-# * Contrastive Loss
+# * Contrastive Loss OR Triplet Loss
 # * (optional) Max-Pooling margin Loss (候補語義を利用してgloss-context similarityを学習する)
 # * (optional) supervised alignment loss (SemCor等を利用してgloss-context alignmentを学習する)
 # 
-# ### Contrastive Loss
+# ### Contrastive Loss OR Triplet Loss
 # * Gloss Embeddings: wordnet_gloss_corpus.cfg_embeddings のいずれか
 # * Dataset: {xLemmaEmbeddings}Dataset -> ContrastiveLearningDataset
 # * Collate Function: ContrastiveDatasetEmbeddingsCollateFunction
@@ -74,7 +74,7 @@ from dataset import WSDTaskDataset
 
 from model import encoder
 from model import similarity
-from model.loss import ContrastiveLoss
+from model.loss import ContrastiveLoss, TripletLoss
 from model.loss_unsupervised import MaxPoolingMarginLoss
 
 def _default_configs():
@@ -139,9 +139,12 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--sense_annotated_dataset_name", required=False, type=nullable_string, default=None, help="Sense-annotated corpus embeddings dataset name. Specifying it enables supervised alignment task.")
     parser.add_argument("--coef_supervised_alignment_loss", required=False, type=float, default=1.0, help="Coefficient of supervised alignment task.")
 
+    parser.add_argument("--main_loss_class_name", required=False, type=str, default="ContrastiveLoss", choices=["ContrastiveLoss", "TripletLoss"],
+                        help="main loss class name for gloss embeddings specialization.")
     parser.add_argument("--similarity_class_name", required=False, type=str, default="CosineSimilarity", choices=["CosineSimilarity", "DotProductSimilarity", "ArcMarginProduct"],
                         help="similarity class for {contrastive, supervised alignment} tasks.")
     parser.add_argument("--use_positives_as_in_batch_negatives", required=False, type=bool, default=True, help="contrastive loss config. use positive examples as weak (=in-batch) negatives.")
+    parser.add_argument("--triplet_loss_margin", required=False, type=float, default=0.0, help="triplet loss margin. takes affect only when main loss is triplet loss.")
     parser.add_argument("--log_every_n_steps", required=False, type=int, default=200)
     parser.add_argument("--val_check_interval", required=False, type=int, default=500)
     parser.add_argument("--gpus", required=False, type=nullable_string, default=None, help="GPU device ids. e.g., `0,3,5`")
@@ -320,8 +323,13 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
 
     ## Loss functions
 
-    ### Contrastive Loss
-    contrastive_loss = ContrastiveLoss(similarity_module=similarity_module, use_positives_as_in_batch_negatives=args.use_positives_as_in_batch_negatives)
+    ### main loss: Contrastive Loss OR Triplet Loss
+    if args.main_loss_class_name == "ContrastiveLoss":
+        main_loss = ContrastiveLoss(similarity_module=similarity_module, use_positives_as_in_batch_negatives=args.use_positives_as_in_batch_negatives)
+    elif args.main_loss_class_name == "TripletLoss":
+        main_loss = TripletLoss(margin=args.triplet_loss_margin, use_positives_as_in_batch_negatives=args.use_positives_as_in_batch_negatives)
+    else:
+        raise ValueError(f"invalid main_loss_class_name: {args.main_loss_class_name}")
 
     ### (optional) Max-Pool Margin loss
     if max_pool_margin_dataset is None:
@@ -337,8 +345,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
     if supervised_alignment_dataset is None:
         supervised_alignment_loss = None
     else:
-        warnings.warn(f"We will enable supervised gloss-context alignment loss. contrastive_loss and supervised_alignment_loss will be shared.")
-        supervised_alignment_loss = contrastive_loss
+        warnings.warn(f"We will enable supervised gloss-context alignment loss.")
+        supervised_alignment_loss = ContrastiveLoss(similarity_module=similarity_module, use_positives_as_in_batch_negatives=args.use_positives_as_in_batch_negatives)
 
     ## DataLoader
     # * `shuffle=True` の場合は `BufferedShuffleDataset` でwrapする
@@ -401,7 +409,7 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
     ## training
     model = FrozenBERTWSDTaskTrainer(gloss_projection_head=gloss_projection_head,
                                      context_projection_head=context_projection_head,
-                                     contrastive_loss=contrastive_loss,
+                                     main_loss=main_loss,
                                      optimizer_params = args.cfg_optimizer,
                                      wsd_evaluation_dataset=eval_dataset,
                                      wsd_evaluation_glosses=gloss_dataset,

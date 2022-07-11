@@ -21,7 +21,7 @@ from dataset import WSDTaskDataset
 from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset
 from evaluator.wsd_knn import FrozenBERTKNNWSDTaskEvaluator
 
-from model.loss import ContrastiveLoss
+from model.loss import ContrastiveLoss, TripletLoss
 from model.loss_unsupervised import MaxPoolingMarginLoss
 from model.utils import pairwise_cosine_similarity, batch_pairwise_cosine_similarity
 from custom.optimizer import AdamWithWarmup
@@ -31,7 +31,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
     def __init__(self,
                  gloss_projection_head: nn.Module,
                  context_projection_head: torch.nn.Module,
-                 contrastive_loss: ContrastiveLoss,
+                 main_loss: Union[ContrastiveLoss, TripletLoss],
                  optimizer_params: Dict[str, Any],
                  wsd_evaluation_dataset: Optional[WSDTaskDataset] = None,
                  wsd_evaluation_glosses: Optional[Union[SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset]] = None,
@@ -51,7 +51,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
             assert wsd_evaluation_glosses is not None, f"you must specify `wsd_evaluation_glosses`"
         self._wsd_evaluation_glosses = wsd_evaluation_glosses
 
-        self._contrastive_loss = contrastive_loss
+        self._contrastive_or_triplet_loss = main_loss
 
         self._gloss_projection_head = gloss_projection_head
         self._context_projection_head = context_projection_head
@@ -60,7 +60,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         self.save_hyperparameters(_hparams)
 
         # set loss functions
-        self._contrastive_loss = contrastive_loss
+        self._contrastive_or_triplet_loss = main_loss
         self._max_pool_margin_loss = max_pool_margin_loss
         self._coef_max_pool_margin_loss = coef_max_pool_margin_loss
         self._supervised_alignment_loss = supervised_alignment_loss
@@ -199,8 +199,8 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                 if verbose:
                     print(f"{loss_name}.{property_name}: {current_value:.2f} -> {new_value:.2f}")
 
-    def _forward_contrastive_task(self, projection_head: nn.Module, loss_function: ContrastiveLoss,
-                                  query, positive, hard_negatives, num_hard_negatives):
+    def _forward_contrastive_or_triplet_task(self, projection_head: nn.Module, loss_function: Union[ContrastiveLoss, TripletLoss],
+                                             query, positive, hard_negatives, num_hard_negatives):
         _query = projection_head(query, is_gloss_embeddings=True)
         _positive = projection_head(positive, is_gloss_embeddings=True)
         _hard_negatives = None if hard_negatives is None else projection_head(hard_negatives, is_gloss_embeddings=True)
@@ -209,6 +209,11 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
             loss = loss_function.forward(queries=_query, positives=_positive)
         else:
             loss = loss_function.forward(queries=_query, positives=_positive, negatives=_hard_negatives, num_negative_samples=num_hard_negatives)
+
+        if loss_function.__class__.__name__ == "TripletLoss":
+            # multiply 100x so that similar scale to contrastive loss.
+            loss = loss * 100
+
         return loss
 
     def _forward_max_pool_margin_task(self, gloss_projection_head: nn.Module, context_projection_head: nn.Module, loss_function: MaxPoolingMarginLoss,
@@ -244,7 +249,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         # contrastive loss
         task_name = "contrastive"
         assert task_name in batch, f"you must specify '{task_name}' DataLoader."
-        contrastive_loss = self._forward_contrastive_task(projection_head=self._gloss_projection_head, loss_function=self._contrastive_loss, **batch[task_name])
+        main_loss = self._forward_contrastive_or_triplet_task(projection_head=self._gloss_projection_head, loss_function=self._contrastive_or_triplet_loss, **batch[task_name])
 
         # (optional) max-pool margin loss
         if self._max_pool_margin_loss is None:
@@ -266,11 +271,11 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                                                                                 loss_function=self._supervised_alignment_loss,
                                                                                 **batch[task_name])
 
-        loss = contrastive_loss + self._coef_max_pool_margin_loss * max_pool_margin_loss + self._coef_supervised_alignment_loss * supervised_alignment_loss
+        loss = main_loss + self._coef_max_pool_margin_loss * max_pool_margin_loss + self._coef_supervised_alignment_loss * supervised_alignment_loss
 
         dict_losses = {
             "train_loss": loss,
-            "train_loss_contrastive": contrastive_loss,
+            "train_loss_contrastive": main_loss,
             "train_loss_max_pool_margin": max_pool_margin_loss,
             "train_loss_supervised_alignment": supervised_alignment_loss
         }
@@ -286,7 +291,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
         # contrastive loss
         _batch = batch["contrastive"]
-        contrastive_loss = self._forward_contrastive_task(projection_head=self._gloss_projection_head, loss_function=self._contrastive_loss, **_batch)
+        contrastive_or_triplet_loss = self._forward_contrastive_or_triplet_task(projection_head=self._gloss_projection_head, loss_function=self._contrastive_or_triplet_loss, **_batch)
 
         # contrastive objective related metrics: alignment, uniformity
         _query = self._gloss_projection_head.forward(_batch["query"], is_gloss_embeddings=True)
@@ -303,7 +308,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
             _batch = batch["supervised_alignment"]
             supervised_alignment_loss = self._forward_supervised_alignment_task(gloss_projection_head=self._gloss_projection_head, context_projection_head=self._context_projection_head,
                                                                                 # we use contrastive loss as an alternative.
-                                                                                loss_function=self._contrastive_loss,
+                                                                                loss_function=self._contrastive_or_triplet_loss,
                                                                                 **_batch)
             _query = self._context_projection_head.forward(_batch["query"], is_gloss_embeddings=False)
             _positive = self._gloss_projection_head.forward(_batch["positive"], is_gloss_embeddings=True)
@@ -319,7 +324,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
             homograph_similarity = batch_pairwise_cosine_similarity(tensors=_homographs, num_samples=_num_homographs, reduction="mean")
 
         metrics = {
-            "val_loss_contrastive": contrastive_loss,
+            "val_loss_contrastive": contrastive_or_triplet_loss,
             "val_contrastive_alignment": alignment,
             "val_contrastive_uniformity": uniformity,
             "val_loss_supervised_alignment": supervised_alignment_loss,

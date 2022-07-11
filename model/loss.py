@@ -9,7 +9,7 @@ from torch.nn.functional import cross_entropy
 import numpy as np
 
 from dataset.utils import numpy_to_tensor
-from similarity import CosineSimilarity
+from .similarity import CosineSimilarity
 from .utils import _reduction
 
 
