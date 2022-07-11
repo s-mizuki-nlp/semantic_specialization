@@ -51,6 +51,10 @@ def objective(trial: optuna.Trial):
     dict_args["val_check_interval"] = int(1000 * 128 / batch_size)
     dict_args["max_epochs"] = 15
     dict_args["batch_size"] = batch_size
+    # optional_v4: learning rate optimization.
+    dict_args["cfg_optimizer"] = {
+        "lr": trial.suggest_loguniform("lr", low=0.00001, high=0.001)
+    }
 
     # contrastive task に関する条件付け
     cfg_contrastive_learning_dataset = {
@@ -67,34 +71,27 @@ def objective(trial: optuna.Trial):
             return 0.0
 
     # max-pool margin task に関する条件付け．
-    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.01, high=5.0)
+    dict_args["coef_max_pool_margin_loss"] = 0.25
     max_margin = 1.0
     top_k = 1
     dict_args["cfg_max_pool_margin_loss"] = {"max_margin": max_margin, "top_k": top_k}
 
     # gloss/context projection head
     gloss_projection_head_name = "NormRestrictedShift"
-    context_projection_head_name = "NormRestrictedShift"
+    context_projection_head_name = "COPY"
     dict_args["gloss_projection_head_name"] = gloss_projection_head_name
     dict_args["context_projection_head_name"] = context_projection_head_name
 
     # gloss projection head configuration
     cfg_gloss_projection_head = {}
     cfg_gloss_projection_head["n_layer"] = 2
-    if gloss_projection_head_name == "NormRestrictedShift":
-        cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("gloss_max_l2_norm_ratio", low=0.001, high=0.1)
-        cfg_gloss_projection_head["init_zeroes"] = True
-        cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
+    cfg_gloss_projection_head["max_l2_norm_ratio"] = 0.015
+    cfg_gloss_projection_head["init_zeroes"] = True
+    cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
 
     # context projection head configuration
-    # optional_v3: apply different hyper-parameters
-    cfg_context_projection_head = {}
-    cfg_context_projection_head["n_layer"] = 2
-    cfg_context_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("context_max_l2_norm_ratio", low=0.001, high=0.1)
-    cfg_context_projection_head["init_zeroes"] = True
-    cfg_context_projection_head["distinguish_gloss_context_embeddings"] = False
-    dict_args["cfg_context_projection_head"] = cfg_context_projection_head
+    dict_args["cfg_context_projection_head"] = {}
 
     # similarity module
     cfg_similarity_class = {
