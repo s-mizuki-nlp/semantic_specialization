@@ -5,13 +5,16 @@ import io, copy, random
 import pickle
 from collections import defaultdict
 from tqdm import tqdm
+from pydash import chunk
 
 import numpy as np
 
+from torch import nn
 from torch.utils.data import Dataset
 from dataset.contextualized_embeddings import BERTEmbeddingsDataset
 from dataset_preprocessor import utils_wordnet, utils_wordnet_gloss
 from .encoder import calc_entity_subwords_average_vectors, extract_entity_spans_from_record, tensor_to_numpy
+from dataset.utils import numpy_to_tensor, tensor_to_numpy
 
 class SREFLemmaEmbeddingsDataset(Dataset):
 
@@ -24,6 +27,7 @@ class SREFLemmaEmbeddingsDataset(Dataset):
         self._path_basic_lemma_embeddings = path
         self._target_pos = target_pos
         self._lemma_surface_form_lowercase = lemma_surface_form_lowercase
+        self._use_first_embeddings_only = use_first_embeddings_only
         self._description = description
 
         force_ndim_to_2 = False if use_first_embeddings_only else True
@@ -34,7 +38,7 @@ class SREFLemmaEmbeddingsDataset(Dataset):
         self._index_by_lemma_and_pos = self._reindex_dataset_using_lemma_and_pos(dataset=self._dataset)
         self._index_by_lemma_key = self._reindex_dataset_using_lemma_key(dataset=self._dataset)
         self._lemma_and_pos_to_lemma_keys = self._map_lemma_and_pos_to_lemma_keys(dataset=self._dataset)
-
+        self._is_projected = False
 
     def __len__(self):
         return len(self._dataset)
@@ -52,6 +56,10 @@ class SREFLemmaEmbeddingsDataset(Dataset):
     def n_dim(self):
         record = self.__getitem__(0)
         return record["embeddings"].shape[-1]
+
+    @property
+    def is_projected(self):
+        return self._is_projected
 
     @classmethod
     def load_basic_lemma_embeddings(cls, path: str, l2_norm: bool, return_first_embeddings_only: bool, force_ndim_to_2: bool = False) -> Dict[str, np.ndarray]:
@@ -143,6 +151,32 @@ class SREFLemmaEmbeddingsDataset(Dataset):
 
         return dict_lemma_and_pos_to_lemma_keys_index
 
+    def project_gloss_embeddings(self, gloss_projection_head: nn.Module, chunksize=1024):
+        assert self._use_first_embeddings_only, f"you must enable `use_first_embeddings_only` option."
+
+        if self.is_projected:
+            raise AssertionError(f"you can't apply projection head multiple times.")
+
+        device = next(gloss_projection_head.parameters()).device
+
+        bar = tqdm(total=self.__len__())
+        for lst_lemma_keys in chunk(self.get_lemma_keys(), chunksize):
+            mat_embeddings = self.get_lemma_key_embeddings(lst_lemma_keys)
+
+            # apply projection
+            t_embeddings = numpy_to_tensor(mat_embeddings).to(device)
+            t_embeddings = gloss_projection_head.predict(t_embeddings, is_gloss_embeddings=True)
+            mat_embeddings = tensor_to_numpy(t_embeddings)
+
+            # set projected embeddings
+            for lemma_key, vec_embedding in zip(lst_lemma_keys, mat_embeddings):
+                self.set_lemma_key_embedding(lemma_key=lemma_key, vec_embedding=vec_embedding)
+            bar.update(len(lst_lemma_keys))
+        bar.close()
+
+        # disable further projection.
+        self._is_projected = True
+
     def get_records_by_lemma_key(self, lemma_key: str) -> List[Dict[str, Any]]:
         lst_records = []
         for idx in self._index_by_lemma_key[lemma_key]:
@@ -192,6 +226,15 @@ class SREFLemmaEmbeddingsDataset(Dataset):
         assert lemma_key in record["ground_truth_lemma_keys"], f"lemma key lookup failure: {lemma_key}"
 
         return record["embeddings"]
+
+    def set_lemma_key_embedding(self, lemma_key: str, vec_embedding: np.ndarray, assertion: bool = True):
+        lst_dict_records = self.get_records_by_lemma_key(lemma_key)
+        assert len(lst_dict_records) == 1, f"specified lemma key don't have single record: {lemma_key}"
+        dict_record = lst_dict_records[0]
+
+        if assertion:
+            assert dict_record["embeddings"].shape == vec_embedding.shape, f"embedding shape mismatch detected: {lemma_key}"
+        dict_record["embeddings"] = vec_embedding
 
     def get_lemma_key_embeddings(self, lst_lemma_keys: List[str]) -> np.ndarray:
         it = map(self.get_lemma_key_embedding, lst_lemma_keys)
