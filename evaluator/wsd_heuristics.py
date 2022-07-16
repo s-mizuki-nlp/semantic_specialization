@@ -19,7 +19,6 @@ class TryAgainMechanism(object):
 
     def __init__(self,
                  lemma_key_embeddings_dataset: SREFLemmaEmbeddingsDataset,
-                 gloss_projection_head: torch.nn.Module,
                  exclude_common_semantically_related_synsets: bool = True,
                  lookup_first_lemma_sense_only: bool = True,
                  average_similarity_in_synset: bool = False,
@@ -31,7 +30,6 @@ class TryAgainMechanism(object):
                  verbose: bool = False):
 
         self._lemma_key_embeddings_dataset = lemma_key_embeddings_dataset
-        self._gloss_prjection_head = gloss_projection_head
 
         if isinstance(similarity_module, str):
             if similarity_module == "cosine":
@@ -122,8 +120,6 @@ class TryAgainMechanism(object):
 
                 mat_gloss_embeddings = self._lemma_key_embeddings_dataset.get_lemma_key_embeddings(lst_lemma_keys)
                 t_gloss_embeddings = numpy_to_tensor(mat_gloss_embeddings).to(self._device)
-                if self._gloss_prjection_head is not None:
-                    t_gloss_embeddings = self._gloss_prjection_head.forward(t_gloss_embeddings)
 
                 t_sim = self._similarity_module.forward(t_query_embedding, t_gloss_embeddings)
                 v_sim = tensor_to_numpy(t_sim)

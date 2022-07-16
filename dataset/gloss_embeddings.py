@@ -162,6 +162,7 @@ class SREFLemmaEmbeddingsDataset(Dataset):
         bar = tqdm(total=self.__len__())
         for lst_lemma_keys in chunk(self.get_lemma_keys(), chunksize):
             mat_embeddings = self.get_lemma_key_embeddings(lst_lemma_keys)
+            assert len(lst_lemma_keys) == mat_embeddings.shape[0], f"something went wrong."
 
             # apply projection
             t_embeddings = numpy_to_tensor(mat_embeddings).to(device)
@@ -170,7 +171,7 @@ class SREFLemmaEmbeddingsDataset(Dataset):
 
             # set projected embeddings
             for lemma_key, vec_embedding in zip(lst_lemma_keys, mat_embeddings):
-                self.set_lemma_key_embedding(lemma_key=lemma_key, vec_embedding=vec_embedding)
+                self.set_lemma_key_embedding(lemma_key=lemma_key, vec_embedding=vec_embedding, assertion=False)
             bar.update(len(lst_lemma_keys))
         bar.close()
 
@@ -251,6 +252,7 @@ class SREFLemmaEmbeddingsDataset(Dataset):
             "num_lemma_and_pos": len(self.get_lemma_and_pos()),
             "num_lemma_keys": len(self.get_lemma_keys()),
             "n_dim": self.n_dim,
+            "is_projected": self.is_projected,
             "description":self._description
         }
         return ret
