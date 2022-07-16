@@ -45,7 +45,7 @@ def objective(trial: optuna.Trial):
 
     # main loss class
     dict_args["main_loss_class_name"] = "TripletLoss"
-    dict_args["triplet_loss_margin"] = trial.suggest_loguniform("triplet_loss_margin", low=0.001, high=0.3)
+    dict_args["triplet_loss_margin"] = trial.suggest_loguniform("triplet_loss_margin", low=0.01, high=0.3)
 
     # always use cosine similarity module
     similarity_class_name = "CosineSimilarity"
@@ -60,7 +60,7 @@ def objective(trial: optuna.Trial):
     cfg_contrastive_learning_dataset = {
         "semantic_relation_for_positives": "all-relations",
         "use_taxonomy_distance_for_sampling_positives": False,
-        "num_hard_negatives": trial.suggest_categorical("num_hard_negatives", [-1, 0, 1, 3, 5, 7, 9]) # 負例に用いる同形異義語の数．-1:無制限，0:なし，N(>0):N個まで
+        "num_hard_negatives": trial.suggest_categorical("num_hard_negatives", [-1, 0, 1, 5, 9]) # 負例に用いる同形異義語の数．-1:無制限，0:なし，N(>0):N個まで
     }
     dict_args["use_positives_as_in_batch_negatives"] = trial.suggest_categorical("use_positives_as_in_batch_negatives", [True, False])
     dict_args["cfg_contrastive_learning_dataset"] = cfg_contrastive_learning_dataset
@@ -70,7 +70,7 @@ def objective(trial: optuna.Trial):
             return 0.0
 
     # max-pool margin task に関する条件付け．
-    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.1, high=1.0)
+    dict_args["coef_max_pool_margin_loss"] = 0.3
     dict_args["cfg_max_pool_margin_loss"] = {"max_margin": 1.0, "top_k": 1}
 
     # gloss/context projection head
@@ -83,7 +83,7 @@ def objective(trial: optuna.Trial):
     cfg_gloss_projection_head = {}
     cfg_gloss_projection_head["n_layer"] = 2
     if gloss_projection_head_name == "NormRestrictedShift":
-        cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.001, high=0.1)
+        cfg_gloss_projection_head["max_l2_norm_ratio"] = 0.015
         cfg_gloss_projection_head["init_zeroes"] = True
         cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
