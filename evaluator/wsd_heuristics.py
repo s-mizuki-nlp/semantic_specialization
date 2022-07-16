@@ -6,9 +6,9 @@ import os, sys, io
 import warnings
 import torch
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 from nltk.corpus import wordnet as wn
 
-from model.similarity import CosineSimilarity, DotProductSimilarity
 from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset
 from dataset.utils import tensor_to_numpy, numpy_to_tensor, batch_tile
 from dataset.sense_expansion import gloss_extend, get_lexname_synsets
@@ -25,21 +25,15 @@ class TryAgainMechanism(object):
                  exclude_oneselves_for_noun_and_verb: bool = True,
                  do_not_fix_synset_degeneration_bug: bool = True,
                  semantic_relation: str = 'all-relations',
-                 similarity_module: Union[str, torch.nn.Module] = "cosine",
+                 similarity_metric: str = "cosine",
                  device: Optional[str] = "cpu",
                  verbose: bool = False):
 
         self._lemma_key_embeddings_dataset = lemma_key_embeddings_dataset
 
-        if isinstance(similarity_module, str):
-            if similarity_module == "cosine":
-                self._similarity_module = CosineSimilarity()
-            elif similarity_module == "dot":
-                self._similarity_module = DotProductSimilarity()
-            else:
-                raise ValueError(f"unknown `similarity_module` name: {similarity_module}")
-        else:
-            self._similarity_module = similarity_module
+        if similarity_metric not in ("cosine","dot"):
+            raise ValueError(f"invalid `similarity_module` name: {similarity_metric}")
+        self._similarity_metric = similarity_metric
 
         self._exclude_common_semantically_related_synsets = exclude_common_semantically_related_synsets
         self._lookup_first_lemma_sense_only = lookup_first_lemma_sense_only
@@ -52,14 +46,14 @@ class TryAgainMechanism(object):
         self._device = device
 
     def try_again_mechanism(self,
-                            t_query_embedding: torch.Tensor,
+                            vec_query_embedding: torch.Tensor,
                             pos: str,
                             lst_candidate_lemma_keys: List[str],
                             lst_candidate_similarities: List[float],
                             top_k_candidates:int = 2,
                             ) -> Tuple[List[str], List[float]]:
 
-        assert t_query_embedding.ndim == 2, f"unexpected dimension size: {t_query_embedding.ndim}"
+        assert vec_query_embedding.ndim == 2, f"unexpected dimension size: {vec_query_embedding.ndim}"
         assert len(lst_candidate_similarities) == len(lst_candidate_lemma_keys), f"length must be identical:\n{lst_candidate_lemma_keys}\n{lst_candidate_similarities}"
 
         # do nothing if there is single candidate.
@@ -117,12 +111,13 @@ class TryAgainMechanism(object):
                 lst_lemma_keys = utils_wordnet_gloss.synset_to_lemma_keys(try_again_synset)
                 if self._lookup_first_lemma_sense_only:
                     lst_lemma_keys = lst_lemma_keys[:1]
-
                 mat_gloss_embeddings = self._lemma_key_embeddings_dataset.get_lemma_key_embeddings(lst_lemma_keys)
-                t_gloss_embeddings = numpy_to_tensor(mat_gloss_embeddings).to(self._device)
 
-                t_sim = self._similarity_module.forward(t_query_embedding, t_gloss_embeddings)
-                v_sim = tensor_to_numpy(t_sim)
+                if self._similarity_metric == "cosine":
+                    v_sim = cosine_similarity(vec_query_embedding.reshape(1,-1), mat_gloss_embeddings).flatten()
+                elif self._similarity_metric == "dot":
+                    v_sim = np.sum(vec_query_embedding.reshape(1,-1)*mat_gloss_embeddings, axis=-1)
+
                 if self._average_similarity_in_synset:
                     lst_try_again_similarities.append(np.mean(v_sim))
                 else:
@@ -137,8 +132,5 @@ class TryAgainMechanism(object):
             try_agian_similarity = dict_candidate_synset_similarities[synset_id]
             idx = lst_candidate_lemma_keys.index(lemma_key)
             lst_candidate_similarities[idx] = original_similarity + try_agian_similarity
-
-            # DEBUG
-            # print(f"{lemma_key}:{lst_candidate_similarities[idx]}")
 
         return lst_candidate_lemma_keys, lst_candidate_similarities

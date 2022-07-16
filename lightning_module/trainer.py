@@ -361,7 +361,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                                                   context_projection_head=self._context_projection_head,
                                                   evaluation_dataset=self._wsd_evaluation_dataset,
                                                   lemma_key_embeddings_dataset=self._wsd_evaluation_glosses,
-                                                  similarity_module="cosine",
+                                                  similarity_metric="cosine",
                                                   device=self._get_model_device())
         dict_metrics = evaluator.evaluate()
 

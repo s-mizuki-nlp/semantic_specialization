@@ -26,7 +26,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
                  context_projection_head: Optional[torch.nn.Module] = None,
                  target_pos: Tuple[str] = ("n","v","a","s","r"),
                  try_again_mechanism: bool = False,
-                 similarity_module: Union[str, torch.nn.Module] = "cosine",
+                 similarity_metric: str = "cosine",
                  evaluation_category: str = "lemma",
                  ground_truth_lemma_keys_field_name: str = "ground_truth_lemma_keys",
                  entity_embedding_field_name: str = "entity_span_avg_vectors",
@@ -49,15 +49,12 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
         self._target_pos = target_pos
         self._context_projection_head = context_projection_head
 
-        if isinstance(similarity_module, str):
-            if similarity_module == "cosine":
-                self._similarity_module = CosineSimilarity(temperature=1.0)
-            elif similarity_module == "dot":
-                self._similarity_module = DotProductSimilarity()
-            else:
-                raise ValueError(f"unknown `similarity_module` name: {similarity_module}")
+        if similarity_metric == "cosine":
+            self._similarity_module = CosineSimilarity(temperature=1.0)
+        elif similarity_metric == "dot":
+            self._similarity_module = DotProductSimilarity()
         else:
-            self._similarity_module = similarity_module
+            raise ValueError(f"unknown `similarity_metric` name: {similarity_metric}")
 
         if try_again_mechanism:
             if isinstance(kwargs_try_again_mechanism, dict):
@@ -72,7 +69,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
                     "semantic_relation": "all-relations"
                 }
             self._try_again_mechanism = TryAgainMechanism(lemma_key_embeddings_dataset=lemma_key_embeddings_dataset,
-                                                          similarity_module=self._similarity_module,
+                                                          similarity_metric=similarity_metric,
                                                           device=device,
                                                           verbose=verbose,
                                                           **_cfg)
@@ -155,11 +152,12 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
         # execute try-again mechanism
         # it updates scores for top-2 most similar candidate lemmas. it never changes candidate order.
         if self._try_again_mechanism is not None:
-            _lst_candidate_lemma_keys, lst_metric_scores = self._try_again_mechanism.try_again_mechanism(t_query_embedding=t_query_embedding,
-                                                                                                    pos=pos,
-                                                                                                    lst_candidate_lemma_keys=lst_candidate_lemma_keys,
-                                                                                                    lst_candidate_similarities=lst_metric_scores,
-                                                                                                    top_k_candidates=2)
+            _lst_candidate_lemma_keys, lst_metric_scores = self._try_again_mechanism.try_again_mechanism(
+                vec_query_embedding=tensor_to_numpy(t_query_embedding),
+                pos=pos,
+                lst_candidate_lemma_keys=lst_candidate_lemma_keys,
+                lst_candidate_similarities=lst_metric_scores,
+                top_k_candidates=2)
             # assertion
             # for lemma, lemma_key in zip(lst_candidate_lemmas, _lst_candidate_lemma_keys):
             #     assert lemma.key() == lemma_key, f"order mismatch detected."
