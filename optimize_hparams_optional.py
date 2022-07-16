@@ -53,7 +53,7 @@ def objective(trial: optuna.Trial):
     dict_args["batch_size"] = batch_size
     # optional_v4: learning rate optimization.
     dict_args["cfg_optimizer"] = {
-        "lr": trial.suggest_loguniform("lr", low=0.00001, high=0.001)
+        "lr": trial.suggest_loguniform("lr", low=0.00001, high=0.01)
     }
 
     # contrastive task に関する条件付け
