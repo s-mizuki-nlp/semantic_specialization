@@ -23,6 +23,7 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
     def __init__(self,
                  evaluation_dataset: WSDTaskDataset,
                  lemma_key_embeddings_dataset: SREFLemmaEmbeddingsDataset,
+                 gloss_projection_head: Optional[torch.nn.Module] = None,
                  context_projection_head: Optional[torch.nn.Module] = None,
                  target_pos: Tuple[str] = ("n","v","a","s","r"),
                  try_again_mechanism: bool = False,
@@ -47,7 +48,20 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
         self._entity_embedding_field_name = entity_embedding_field_name
         self._lemma_key_embeddings_dataset = lemma_key_embeddings_dataset
         self._target_pos = target_pos
+        self._gloss_projection_head = gloss_projection_head
         self._context_projection_head = context_projection_head
+
+        if lemma_key_embeddings_dataset.is_projected:
+            warnings.warn(f"we ignore gloss_projection_head because lemma key embeddings are already projected.")
+            self._apply_gloss_projection = False
+            self._gloss_projection_head = None
+        else:
+            if self._gloss_projection_head is not None:
+                warnings.warn(f"we apply gloss_projection_head on site because lemma key embeddings isn't pre-projected.")
+                self._apply_gloss_projection = True
+            else:
+                warnings.warn(f"no gloss projection is applied.")
+                self._apply_gloss_projection = False
 
         if similarity_metric == "cosine":
             self._similarity_module = CosineSimilarity(temperature=1.0)
@@ -128,6 +142,9 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
         # lookup candidate lemma key embeddings from WordNet gloss embeddings dataset
         device = input["entity_embeddings"].device
         t_candidate_lemma_key_embeddings = self.get_lemma_key_embeddings(lst_candidate_lemma_keys).to(device)
+        # project gloss embeddings if 1) pre-projection is not applied and 2) gloss_projection_head is available.
+        if self._apply_gloss_projection:
+            t_candidate_lemma_key_embeddings = self._gloss_projection_head.predict(t_candidate_lemma_key_embeddings, is_gloss_embeddings=True)
 
         # query embedding:
         # shape: (1, n_dim) if entity_embedding_field_name = "entity_span_avg_vectors"
