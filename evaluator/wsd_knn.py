@@ -10,7 +10,7 @@ import torch
 from nltk.corpus import wordnet as wn
 
 from .wsd_baseline import MostFrequentSenseWSDTaskEvaluator, numeric
-from .wsd_heuristics import TryAgainMechanism
+from .wsd_heuristics import TryAgainMechanism, TryAgainMechanismWithCoarseSenseInventory
 from dataset import WSDTaskDataset
 from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset
 from dataset.utils import tensor_to_numpy, numpy_to_tensor
@@ -70,25 +70,34 @@ class FrozenBERTKNNWSDTaskEvaluator(MostFrequentSenseWSDTaskEvaluator):
         else:
             raise ValueError(f"unknown `similarity_metric` name: {similarity_metric}")
 
-        if try_again_mechanism:
-            if isinstance(kwargs_try_again_mechanism, dict):
-                _cfg = kwargs_try_again_mechanism
-            else:
-                _cfg = {
-                    "exclude_common_semantically_related_synsets": True,
-                    "lookup_first_lemma_sense_only": False,
-                    "average_similarity_in_synset": False,
-                    "exclude_oneselves_for_noun_and_verb": True,
-                    "do_not_fix_synset_degeneration_bug": False,
-                    "semantic_relation": "all-relations"
-                }
-            self._try_again_mechanism = TryAgainMechanism(lemma_key_embeddings_dataset=lemma_key_embeddings_dataset,
-                                                          similarity_metric=similarity_metric,
-                                                          device=device,
-                                                          verbose=verbose,
-                                                          **_cfg)
-        else:
+        # try-again mechanism
+        if try_again_mechanism is None:
             self._try_again_mechanism = None
+        elif isinstance(try_again_mechanism, (TryAgainMechanism, TryAgainMechanismWithCoarseSenseInventory)):
+            self._try_again_mechanism = try_again_mechanism
+        elif isinstance(try_again_mechanism, bool):
+            if try_again_mechanism:
+                if isinstance(kwargs_try_again_mechanism, dict):
+                    _cfg = kwargs_try_again_mechanism
+                else:
+                    _cfg = {
+                        "exclude_common_semantically_related_synsets": True,
+                        "lookup_first_lemma_sense_only": False,
+                        "average_similarity_in_synset": False,
+                        "exclude_oneselves_for_noun_and_verb": True,
+                        "do_not_fix_synset_degeneration_bug": False,
+                        "semantic_relation": "all-relations"
+                    }
+                self._try_again_mechanism = TryAgainMechanism(lemma_key_embeddings_dataset=lemma_key_embeddings_dataset,
+                                                              similarity_metric=similarity_metric,
+                                                              device=device,
+                                                              verbose=verbose,
+                                                              **_cfg)
+            else:
+                self._try_again_mechanism = None
+        else:
+            raise ValueError(f"invalid `try_again_mechanism` argument: {type(try_again_mechanism)}")
+
 
     def get_lemma_key_embedding(self, lemma_key: str) -> np.ndarray:
         """
