@@ -113,3 +113,13 @@ def is_instance_of_lemma(str_lemma: str, pos: str):
 def is_monosemous_lemma(lemma_name: str, pos: str):
     lst_lemmas = wn.lemmas(lemma_name, pos=pos)
     return len(lst_lemmas) == 1
+
+def synset_offset_to_synset_id(synset_offset: str):
+    # convert from synset offset to synset id.
+    # e.g., wn:08641944n -> lauryl_alcohol.n.01
+    str_offset = synset_offset.replace("wn:", "")[:-1]
+    pos = synset_offset[-1]
+
+    synset = wn.synset_from_pos_and_offset(pos, int(str_offset))
+
+    return synset.name()
