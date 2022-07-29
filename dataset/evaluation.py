@@ -323,3 +323,205 @@ class WSDEvaluationDataset(Dataset):
             "transform_functions": self._transform_functions
         }
         return ret
+
+
+class WordInContextDataset(Dataset):
+
+    def __init__(self, path_corpus: str,
+                 path_ground_truth_labels: Optional[str] = None,
+                 transform_functions = None,
+                 filter_function: Optional[Union[Callable, List[Callable]]] = None,
+                 entity_filter_function: Optional[Union[Callable, List[Callable]]] = None,
+                 description: str = ""):
+
+        """
+        [Pilehvar+, 2019]が提供するWord-in-Context Datasetを読み込むクラス
+
+        [Pilehvar+, 2019] WiC: the Word-in-Context Dataset for Evaluating Context-Sensitive Meaning Representations
+        https://pilehvar.github.io/wic/
+
+        :param path_corpos: コーパス（文ペア）のパス (`*.data.txt`)
+        :param path_ground_truth_labels: 正解ラベルのパス(`*.gold.txt`)
+        :param transform_functions: データ変形定義，Dictionaryを指定．keyはフィールド名，valueは変形用関数
+        :param filter_function: 除外するか否かを判定する関数
+        :param description: 説明
+        """
+
+        super().__init__()
+
+        assert os.path.exists(path_corpus), f"invalid path specified: {path_corpus}"
+        self._path_corpus = path_corpus
+        self._path_ground_truth_labels = path_ground_truth_labels
+
+        self._description = description
+        self._transform_functions = transform_functions
+
+        if filter_function is None:
+            self._filter_function = []
+        elif isinstance(filter_function, list):
+            self._filter_function = filter_function
+        elif not isinstance(filter_function, list):
+            self._filter_function = [filter_function]
+
+        if entity_filter_function is None:
+            self._entity_filter_function = []
+        elif isinstance(entity_filter_function, list):
+            self._entity_filter_function = entity_filter_function
+        elif not isinstance(entity_filter_function, list):
+            self._entity_filter_function = [entity_filter_function]
+
+        self._n_sample = None
+
+        self._raw_records = self._preload_sentences(path_corpus=path_corpus, path_ground_truth_labels=path_ground_truth_labels)
+        self._preprocessed_records = [record for record in self]
+
+    def _load_ground_truth_labels(self, path: str):
+        dict_labels = {}
+        with io.open(path, mode="r") as ifs:
+            for entry in ifs:
+                lst_ = entry.strip("\n").split(" ")
+                key, labels = lst_[0], lst_[1:]
+                dict_labels[key] = labels
+        return dict_labels
+
+    def _sentence_loader(self, path_corpus: str, path_ground_truth_labels: Optional[str] = None) -> Iterable[Dict[str, Any]]:
+
+        with io.open(path_corpus, mode="r") as ifs:
+            lst_sentence_pairs = [sentence_pair.strip() for sentence_pair in ifs]
+        if path_ground_truth_labels is not None:
+            with io.open(path_ground_truth_labels, mode="r") as ifs:
+                lst_str_gold_labels = [str_gold_label.strip() for str_gold_label in ifs]
+        else:
+            lst_str_gold_labels = [None]*len(lst_sentence_pairs)
+
+        lst_header = "lemma,pos,word_positions,sentence1,sentence2".split(",")
+        map_gold_label = {"F": False, "T": True}
+        for index, (sentence_pair, str_gold_label) in enumerate(zip(lst_sentence_pairs, lst_str_gold_labels)):
+            lst_values = sentence_pair.split("\t")
+            gold_label = None if str_gold_label is None else map_gold_label[str_gold_label]
+            dict_record = dict(zip(lst_header, lst_values))
+
+            lst_word_positions = map(int, dict_record["word_positions"].split("-"))
+            for word_position, sentence in zip(lst_word_positions,
+                                               [dict_record["sentence1"], dict_record["sentence2"]]):
+                dict_sentence = {
+                    "sentence_pair_id": f"{index:06d}",
+                    "ground_truth_label": gold_label,
+                    "tokenized_sentence": sentence,
+                    "words": sentence.split(" "),
+                    "entities": [
+                        {"span": [word_position, word_position + 1],
+                         "lemma": dict_record["lemma"].lower(),
+                         "pos": dict_record["pos"].lower(),
+                         }
+                    ]
+                }
+                yield dict_sentence
+
+    def _preload_sentences(self, path_corpus: str, path_ground_truth_labels: str) -> List[Dict[str, Any]]:
+        lst_sentences = []
+        for record in self._sentence_loader(path_corpus, path_ground_truth_labels):
+            lst_sentences.append(record)
+        return lst_sentences
+
+    def get_record(self, idx: int):
+        record = self._raw_records[idx]
+        return record
+
+    def _filter_transform_records(self, record):
+        # transform each field of the entry
+        entry = self._transform(record)
+        # filter entities
+        entry["entities"] = self._entity_filter(entry["entities"])
+        # verify the entry is valid or not
+        if self._filter(entry) == True:
+            return None
+
+        return entry
+
+    def _apply(self, apply_field_name: str, apply_function: Callable, na_value: Optional[Any] = None):
+
+        _transform_cache = self._transform_functions
+        self._transform_functions = None
+
+        it = (entry.get(apply_field_name, na_value) for entry in self)
+        ret =  apply_function(filter(bool, it))
+
+        self._transform_functions = _transform_cache
+        return ret
+
+    @property
+    def has_ground_truth(self):
+        return self._path_ground_truth_labels is not None
+
+    def distinct_values(self, column: str) -> List[str]:
+        return self._apply(apply_field_name=column, apply_function=lambda it: list(set(it)))
+
+    def iter_specific_field(self, field_name: str, na_value: Optional[Any] = None):
+        for entry in self:
+            yield entry.get(field_name, na_value)
+
+    def __len__(self):
+        if self._n_sample is not None:
+            return self._n_sample
+
+        n_sample = 0
+        for _ in self:
+            n_sample += 1
+
+        self._n_sample = n_sample
+
+        return n_sample
+
+    def _transform(self, entry: Dict[str, Any]):
+        if self._transform_functions is None:
+            return entry
+
+        for field_name, transform_function in self._transform_functions.items():
+            entry[field_name] = transform_function(entry[field_name])
+
+        return entry
+
+    def _filter(self, entry: Dict[str, Any]):
+        for filter_function in self._filter_function:
+            if filter_function(entry) == True:
+                return True
+        return False
+
+    def _entity_filter(self, lst_entities: List[Dict[str, Any]]):
+        lst_ret = []
+        for entity in lst_entities:
+            is_filtered_entity = any([filter_function(entity) for filter_function in self._entity_filter_function])
+            if not is_filtered_entity:
+                lst_ret.append(entity)
+        return lst_ret
+
+    def __getitem__(self, index):
+        return self._preprocessed_records[index]
+
+    def __iter__(self):
+        if isinstance(self._transform_functions, dict):
+            for field_name, function in self._transform_functions.items():
+                if hasattr(function, "reset"):
+                    function.reset()
+
+        for idx in range(len(self._raw_records)):
+            record = self.get_record(idx)
+            record = self._filter_transform_records(record)
+            if record is None:
+                continue
+            else:
+                yield record
+
+    @property
+    def verbose(self):
+        ret = {
+            "path_corpus": self._path_corpus,
+            "path_ground_truth_labels": self._path_ground_truth_labels,
+            "has_ground_truth": self.has_ground_truth,
+            "nrows": self.__len__(),
+            "description": self._description,
+            "filter_function": self._filter_function,
+            "transform_functions": self._transform_functions
+        }
+        return ret
