@@ -367,6 +367,11 @@ class WordInContextTaskDataset(WSDTaskDataset):
                          filter_function=filter_function)
         self._description = description
 
+    @property
+    def has_ground_truth(self):
+        record = next(super().__iter__())
+        return record["ground_truth_label"] is not None
+
     def __len__(self):
         return super().__len__() // 2
 
