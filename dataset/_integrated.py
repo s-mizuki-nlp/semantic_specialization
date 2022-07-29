@@ -330,3 +330,71 @@ class WSDTaskDatasetCollateFunction(object):
             dict_ret["records"] = lst_records
 
         return dict_ret
+
+
+class WordInContextTaskDataset(WSDTaskDataset):
+
+    def __init__(self,
+                 path_or_bert_embeddings_dataset: Union[str, BERTEmbeddingsDataset],
+                 kwargs_bert_embeddings_dataset: Optional[Dict[str, str]] = None,
+                 record_entity_field_name: str = "entities",
+                 record_entity_span_field_name: str = "subword_spans",
+                 copy_field_names_from_record_to_entity: Optional[Iterable[str]] = ["sentence_pair_id", "tokenized_sentence", "words", "ground_truth_label"],
+                 weighted_average_entity_embeddings_and_sentence_embedding: float = 0.0,
+                 normalize_embeddings: bool = False,
+                 excludes: Optional[Set[str]] = None,
+                 filter_function: Optional[Union[Callable, List[Callable]]] = None,
+                 description: str = ""):
+
+        if isinstance(path_or_bert_embeddings_dataset, str):
+            _kwargs = {} if kwargs_bert_embeddings_dataset is None else kwargs_bert_embeddings_dataset
+            _kwargs["path"] = path_or_bert_embeddings_dataset
+            bert_embeddings_dataset = BERTEmbeddingsDataset(**_kwargs)
+        else:
+            bert_embeddings_dataset = path_or_bert_embeddings_dataset
+
+        super().__init__(has_ground_truth=False,
+                         bert_embeddings_dataset=bert_embeddings_dataset,
+                         return_level="entity",
+                         record_entity_field_name=record_entity_field_name,
+                         record_entity_span_field_name=record_entity_span_field_name,
+                         ground_truth_lemma_keys_field_name=None,
+                         copy_field_names_from_record_to_entity=copy_field_names_from_record_to_entity,
+                         return_entity_subwords_avg_vector=True,
+                         weighted_average_entity_embeddings_and_sentence_embedding=weighted_average_entity_embeddings_and_sentence_embedding,
+                         normalize_embeddings=normalize_embeddings,
+                         excludes=excludes,
+                         filter_function=filter_function)
+        self._description = description
+
+    def __len__(self):
+        return super().__len__() // 2
+
+    def __iter__(self):
+        for idx, _record in enumerate(super().__iter__()):
+            if idx % 2 == 0:
+                x = _record
+                continue
+            else:
+                y = _record
+            self.assert_sentence_pair(x, y)
+            record = self.sentence_pair_to_record(x, y)
+            yield record
+
+    def assert_sentence_pair(self, x, y):
+        lst_compare_fields = "sentence_pair_id,ground_truth_label,lemma,pos".split(",")
+        for compare_field in lst_compare_fields:
+            assert x[compare_field] == y[compare_field], f"sentence pair mismatch: {compare_field}"
+
+    def sentence_pair_to_record(self, sentence_x, sentence_y):
+        lst_single_copy_fields = "lemma,pos,sentence_pair_id,ground_truth_label".split(",")
+        record = {}
+        for copy_field in lst_single_copy_fields:
+            record[copy_field] = sentence_x[copy_field]
+
+        lst_dual_copy_fields = "entity_span_avg_vector,span,words,tokenized_sentence".split(",")
+        for copy_field in lst_dual_copy_fields:
+            record[f"{copy_field}_x"] = sentence_x[copy_field]
+            record[f"{copy_field}_y"] = sentence_y[copy_field]
+
+        return record
