@@ -421,8 +421,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
                                      loss_parameter_schedulers=None,
                                      hparams=vars(args))
 
-    name = PLATFORM_NAME if args.name is None else args.name
-    logger = pl_loggers.TensorBoardLogger(save_dir=DEFAULT_SAVE_DIR, name=name, version=args.version, default_hp_metric=True)
+    platform_name = PLATFORM_NAME if args.name is None else args.name
+    logger = pl_loggers.TensorBoardLogger(save_dir=DEFAULT_SAVE_DIR, name=platform_name, version=args.version, default_hp_metric=True)
     checkpoint_callback = ModelCheckpoint(filename="{epoch}", save_last=True)
 
     system = pl.Trainer(logger=logger, callbacks=[checkpoint_callback],
@@ -448,7 +448,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         mode = "a" if os.path.exists(path_save) else "w"
         tensor_to_item = lambda v: v.item() if torch.is_tensor(v) else v
         dict_metrics = {key: tensor_to_item(value) for key, value in system.logged_metrics.items()}
-        dict_metrics["checkpoint"] = f"{platform}/version_{logger.version}"
+        dict_metrics["checkpoint"] = f"{platform_name}/version_{logger.version}"
+        dict_metrics["index"] = f"{platform_name}/version_{logger.version}"
         with io.open(path_save, mode=mode) as ofs:
             json.dump(dict_metrics, ofs)
             ofs.write("\n")
