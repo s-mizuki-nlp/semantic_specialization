@@ -449,7 +449,7 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         tensor_to_item = lambda v: v.item() if torch.is_tensor(v) else v
         dict_metrics = {key: tensor_to_item(value) for key, value in system.logged_metrics.items()}
         dict_metrics["checkpoint"] = f"{platform_name}/version_{logger.version}"
-        dict_metrics["index"] = f"{platform_name}/version_{logger.version}"
+        dict_metrics["index"] = f"{platform_name}"
         with io.open(path_save, mode=mode) as ofs:
             json.dump(dict_metrics, ofs)
             ofs.write("\n")
