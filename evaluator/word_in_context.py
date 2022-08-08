@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-from __future__ import absolute_import
-from __future__ import unicode_literals
-from __future__ import division
-from __future__ import print_function
 
 import copy
 from abc import ABCMeta, abstractmethod
@@ -12,12 +8,18 @@ from pprint import pprint
 
 import warnings
 from collections import defaultdict
+from nltk.corpus import wordnet as wn
 import numpy as np
+import torch
 from torch.nn import functional as F
 from sklearn.metrics import roc_curve, accuracy_score, roc_auc_score
 
 from dataset import WordInContextTaskDataset
+from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset
+from dataset.utils import tensor_to_numpy, numpy_to_tensor
+from dataset_preprocessor.utils_wordnet_gloss import wu_palmer_similarity_lemma_key_pair
 from model.encoder import NormRestrictedShift
+from model.similarity import CosineSimilarity
 
 
 class WordInContextTaskEvaluatorBase(object, metaclass=ABCMeta):
@@ -122,14 +124,16 @@ class WordInContextTaskEvaluatorBase(object, metaclass=ABCMeta):
         assert self.assertion(), f"assertion failed."
 
         # optimize similarity threshold
-        lst_similarities, lst_ground_truthes = self.batch_calc_similarity(dataset=self._development_dataset, return_ground_truth=True, **kwargs)
-        if "step" in kwargs:
-            step = kwargs.pop("step")
-        else:
-            step = 0.02
-        threshold_opt = self.grid_search_optimal_threshold_accuracy(y_true=lst_ground_truthes, similarity_value=lst_similarities,
-                                                                    sim_min=-1.0, sim_max=1.0, step=step, verbose=self.verbose,
-                                                                    **kwargs)
+
+        ## if explicitly specified, use as-is
+        threshold_opt = kwargs.get("threshold_opt", None)
+        ## otherwise, we estimate by grid-search using development set.
+        if threshold_opt is None:
+            step = kwargs.pop("step") if "step" in kwargs else 0.02
+            lst_similarities, lst_ground_truthes = self.batch_calc_similarity(dataset=self._development_dataset, return_ground_truth=True, **kwargs)
+            threshold_opt = self.grid_search_optimal_threshold_accuracy(y_true=lst_ground_truthes, similarity_value=lst_similarities,
+                                                                        sim_min=-1.0, sim_max=1.0, step=step, verbose=self.verbose,
+                                                                        **kwargs)
 
         # compute similarities and do prediction using optimal threshold
         if self._evaluation_dataset.has_ground_truth:
@@ -196,3 +200,153 @@ class WiCTaskByEmbeddingSimilarityEvaluator(WordInContextTaskEvaluatorBase):
         sim = F.cosine_similarity(t_x, t_y, dim=-1).item()
 
         return sim
+
+
+class WiCTaskByNNSenseSimilarityEvaluator(WordInContextTaskEvaluatorBase):
+
+    def __init__(self,
+                 development_dataset: WordInContextTaskDataset,
+                 evaluation_dataset: WordInContextTaskDataset,
+                 lemma_key_embeddings_dataset: SREFLemmaEmbeddingsDataset,
+                 sense_similarity_metric: str,
+                 gloss_projection_head: Optional[torch.nn.Module] = None,
+                 context_projection_head: Optional[torch.nn.Module] = None,
+                 verbose: bool = False):
+        """
+        Evaluate Word-in-Context task using word / sentence similarity
+
+        Args:
+            development_dataset:
+            evaluation_dataset:
+            context_embedding_entity: "sentence" or "word". "sentence" uses average of all subwords in a sentence while "word" uses subwords in a word of interest.
+            verbose:
+        """
+
+        super().__init__(development_dataset=development_dataset, evaluation_dataset=evaluation_dataset, verbose=verbose)
+
+        self._lemma_key_embeddings_dataset = lemma_key_embeddings_dataset
+        self._gloss_projection_head = gloss_projection_head
+        self._context_projection_head = context_projection_head
+        self._sense_similarity_metric = sense_similarity_metric
+
+        available_sense_similarity_metric = ("identity", "wu_palmer")
+        assert sense_similarity_metric in available_sense_similarity_metric, f"invalid `sense_similarity_metric` is specified. available values are: {available_sense_similarity_metric}"
+
+        if lemma_key_embeddings_dataset.is_projected:
+            warnings.warn(f"we ignore gloss_projection_head because lemma key embeddings are already projected.")
+            self._apply_gloss_projection = False
+            self._gloss_projection_head = None
+        else:
+            if (gloss_projection_head is not None) and (gloss_projection_head.__class__.__name__ != "Identity"):
+                print("apply gloss projection head to gloss embeddings...")
+                self._lemma_key_embeddings_dataset.project_gloss_embeddings(gloss_projection_head=gloss_projection_head, chunksize=1024)
+                self._apply_gloss_projection = False
+                self._gloss_projection_head = None
+            else:
+                warnings.warn(f"no gloss projection is applied.")
+                self._apply_gloss_projection = False
+
+        self._similarity_module = CosineSimilarity(temperature=1.0)
+
+    def get_candidate_lemmas_from_wordnet(self, str_lemma: str, pos: str) -> List[wn.lemma]:
+        lst_lemmas = wn.lemmas(str_lemma, pos=pos)
+        assert len(lst_lemmas) > 0, f"unknown lemma: {str_lemma}|{pos}"
+        return lst_lemmas
+
+    def get_lemma_key_embedding(self, lemma_key: str) -> np.ndarray:
+        """
+        get lemma key embedding which is precomputed using WordNet gloss corpus.
+
+        Args:
+            lemma_key: lemma key.
+
+        Returns: lemma key embedding. shape: (n_dim, )
+
+        """
+        lst_records = self._lemma_key_embeddings_dataset.get_records_by_lemma_key(lemma_key=lemma_key)
+        assert len(lst_records) == 1, f"record must be unique for each lemma key: {lemma_key}"
+        record = lst_records[0]
+        assert lemma_key in record["ground_truth_lemma_keys"], f"lemma key lookup failure: {lemma_key}"
+
+        return record["embeddings"]
+
+    def get_lemma_key_embeddings(self, lst_lemma_keys: List[str]) -> torch.Tensor:
+        it = map(self.get_lemma_key_embedding, lst_lemma_keys)
+        v_embs = np.stack(list(it))
+        return numpy_to_tensor(v_embs)
+
+    def return_top_k_lemma_keys(self, lst_lemmas: List[wn.lemma], lst_scores: Union[List[float], Tuple[List[float]]],
+                                multiple_output: bool) -> List[str]:
+        if isinstance(lst_scores, tuple):
+            lst_scores = list(zip(*lst_scores))
+        lst_tup_lemma_and_scores = list(zip(lst_lemmas, lst_scores))
+        lst_tup_lemma_and_scores = sorted(lst_tup_lemma_and_scores, key=lambda tup: tup[1], reverse=True)
+
+        if multiple_output:
+            lst_keys = []; prev_scores = None
+            for lemma, scores in lst_tup_lemma_and_scores:
+                if (prev_scores is not None) and (scores < prev_scores):
+                    break
+                lst_keys.append(lemma.key())
+                prev_scores = scores
+            return lst_keys
+        else:
+            lemma, scores = lst_tup_lemma_and_scores[0]
+            return [lemma.key()]
+
+    def predict_sense(self, lemma_name: str, pos: str, context_embedding: torch.Tensor):
+        """
+        predict the most similar sense based on gloss-context similarity
+
+        @return:
+        """
+
+        # get candidates
+        lst_candidate_lemmas = self.get_candidate_lemmas_from_wordnet(lemma_name, pos)
+        n_candidates = len(lst_candidate_lemmas)
+        lst_candidate_lemma_keys = [lemma.key() for lemma in lst_candidate_lemmas]
+
+        # lookup candidate lemma key embeddings from WordNet gloss embeddings dataset
+        device = context_embedding.device
+        t_candidate_lemma_key_embeddings = self.get_lemma_key_embeddings(lst_candidate_lemma_keys).to(device)
+
+        # query embedding:
+        # shape: (1, n_dim) if entity_embedding_field_name = "entity_span_avg_vectors"
+        # shape: (1, n_subwords, n_dim) if entity_embedding_field_name = "entities"
+        t_query_embedding = context_embedding
+        if t_query_embedding.ndim == 3:
+            # average along subword dimension (=2nd dimension)
+            t_query_embedding = torch.mean(t_query_embedding, dim=1)
+
+        # project query(=context) embeddings if context_projection_head is specified.
+        if self._context_projection_head is not None:
+            t_query_embedding = self._context_projection_head.predict(t_query_embedding, is_gloss_embeddings=False)
+
+        # inference using k-NN method.
+        t_query_embeddings = torch.tile(t_query_embedding, (n_candidates, 1))
+        assert t_candidate_lemma_key_embeddings.shape == t_query_embeddings.shape, f"query and candidate shape mismatch."
+
+        # calculate similarity
+        t_sim_score = self._similarity_module(t_query_embeddings, t_candidate_lemma_key_embeddings)
+        lst_scores = tensor_to_numpy(t_sim_score).tolist()
+
+        lst_predictions = self.return_top_k_lemma_keys(lst_candidate_lemmas, lst_scores, multiple_output=False)
+        return lst_predictions[0]
+
+    def calc_similarity(self, input: Dict[str, Any], **kwargs) -> float:
+        lemma_x = self.predict_sense(lemma_name=input["lemma"], pos=input["pos"], context_embedding=input["entity_span_avg_vector_x"])
+        lemma_y = self.predict_sense(lemma_name=input["lemma"], pos=input["pos"], context_embedding=input["entity_span_avg_vector_y"])
+
+        if self._sense_similarity_metric == "identity":
+            sim = 1.0 if lemma_x == lemma_y else 0.0
+        elif self._sense_similarity_metric == "wu_palmer":
+            sim = wu_palmer_similarity_lemma_key_pair(lemma_key_x=lemma_x, lemma_key_y=lemma_y)
+
+        return sim
+
+    def evaluate(self, **kwargs) -> [Dict[str, float], List[float], List[bool], Optional[List[bool]]]:
+        if self._sense_similarity_metric == "identity":
+            # we can deterministically specify optimal threshold as 0.5 because similarity is zero-one.
+            return super().evaluate(threshold_opt=0.5)
+        elif self._sense_similarity_metric == "wu_palmer":
+            return super().evaluate()
