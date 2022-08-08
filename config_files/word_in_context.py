@@ -41,3 +41,4 @@ cfg_tasks = {
         "description": "Word-in-Context task test set encoded by BERT-large-cased."
     }
 }
+

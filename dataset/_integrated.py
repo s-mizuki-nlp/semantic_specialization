@@ -377,6 +377,9 @@ class WordInContextTaskDataset(WSDTaskDataset):
 
     def __iter__(self):
         for idx, _record in enumerate(super().__iter__()):
+            assert _record["context_embedding"].shape[0] == _record["context_sequence_length"]
+            _record["sentence_vector"] = _record["context_embedding"].mean(axis=0)
+
             if idx % 2 == 0:
                 x = _record
                 continue
@@ -397,7 +400,7 @@ class WordInContextTaskDataset(WSDTaskDataset):
         for copy_field in lst_single_copy_fields:
             record[copy_field] = sentence_x[copy_field]
 
-        lst_dual_copy_fields = "entity_span_avg_vector,span,words,tokenized_sentence".split(",")
+        lst_dual_copy_fields = "sentence_vector,entity_span_avg_vector,span,words,tokenized_sentence".split(",")
         for copy_field in lst_dual_copy_fields:
             record[f"{copy_field}_x"] = sentence_x[copy_field]
             record[f"{copy_field}_y"] = sentence_y[copy_field]
