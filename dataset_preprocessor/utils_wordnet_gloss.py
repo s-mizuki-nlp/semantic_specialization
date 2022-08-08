@@ -123,3 +123,11 @@ def synset_offset_to_synset_id(synset_offset: str):
     synset = wn.synset_from_pos_and_offset(pos, int(str_offset))
 
     return synset.name()
+
+def wu_palmer_similarity_lemma_key_pair(lemma_key_x: str, lemma_key_y: str):
+    synset_id_x = lemma_key_to_synset_id(lemma_key_x)
+    synset_id_y = lemma_key_to_synset_id(lemma_key_y)
+    if synset_id_x == synset_id_y:
+        return 1.0
+    else:
+        return wn.wup_similarity(wn.synset(synset_id_x), wn.synset(synset_id_y))
