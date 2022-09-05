@@ -63,14 +63,14 @@ class PairwiseSimilarityPreservationLoss(L._Loss):
 class MaxPoolingMarginLoss(L._Loss):
 
     def __init__(self, similarity_module: Optional[torch.nn.Module] = None,
-                 max_margin: float = 0.7, top_k: int = 1,
+                 label_threshold: float = 0.0, top_k: int = 1,
                  size_average=None, reduce=None, reduction: str = "mean"):
         super().__init__(size_average, reduce, reduction)
 
         assert top_k > 0, f"`top_k` must be positive integer: {top_k}"
 
         self._similarity = CosineSimilarity(temperature=1.0) if similarity_module is None else similarity_module
-        self._max_margin = max_margin
+        self._label_threshold = label_threshold
         self._top_k = top_k
         self._size_average = size_average
         self._reduce = reduce
@@ -99,8 +99,7 @@ class MaxPoolingMarginLoss(L._Loss):
             t_denom = self._top_k - mask_tensor[:,:self._top_k].sum(dim=-1)
             vec_sim_topk_mean = mat_sim_topk.sum(dim=-1) / t_denom
 
-        # hinge loss
-        # targets: (n,). targets[i] = 0; ground-truth (=positive) class index is always zero.
-        losses = torch.maximum(torch.zeros_like(vec_sim_topk_mean), self._max_margin - vec_sim_topk_mean)
+        # loss = 1.0 - negative top-k similarity as long as
+        losses = (1.0 - vec_sim_topk_mean) * (vec_sim_topk_mean > self._label_threshold) + 1.0 * (vec_sim_topk_mean <= self._label_threshold)
 
         return _reduction(losses, self.reduction)
