@@ -41,7 +41,7 @@ def objective(trial: optuna.Trial):
     }
 
     # always enable max-pool margin task
-    context_dataset_name = "SemCor-bert-large-cased"
+    context_dataset_name = "SemCor+OMSTI-bert-large-cased"
 
     # always use cosine similarity module
     similarity_class_name = "CosineSimilarity"
@@ -56,7 +56,7 @@ def objective(trial: optuna.Trial):
     cfg_contrastive_learning_dataset = {
         "semantic_relation_for_positives": "all-relations",
         "use_taxonomy_distance_for_sampling_positives": False,
-        "num_hard_negatives": trial.suggest_categorical("num_hard_negatives", [-1, 0, 1, 3, 5, 7, 9]) # 負例に用いる同形異義語の数．-1:無制限，0:なし，N(>0):N個まで
+        "num_hard_negatives": 5
     }
     dict_args["use_positives_as_in_batch_negatives"] = True
     dict_args["cfg_contrastive_learning_dataset"] = cfg_contrastive_learning_dataset
@@ -66,14 +66,14 @@ def objective(trial: optuna.Trial):
             return 0.0
 
     # max-pool margin task に関する条件付け．
-    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.1, high=1.0)
+    dict_args["coef_max_pool_margin_loss"] = 0.2
     max_margin = 1.0 # trial.suggest_discrete_uniform("max_margin", low=0.5, high=1.0, q=0.1)
-    top_k = trial.suggest_int("top_k", low=1, high=7)
+    top_k = 1
     dict_args["cfg_max_pool_margin_loss"] = {"max_margin": max_margin, "top_k": top_k}
 
     # gloss/context projection head
     gloss_projection_head_name = "NormRestrictedShift"
-    context_projection_head_name = "SHARED"
+    context_projection_head_name = "COPY"
     dict_args["gloss_projection_head_name"] = gloss_projection_head_name
     dict_args["context_projection_head_name"] = context_projection_head_name
 
@@ -81,9 +81,9 @@ def objective(trial: optuna.Trial):
     cfg_gloss_projection_head = {}
     cfg_gloss_projection_head["n_layer"] = 2
     if gloss_projection_head_name == "NormRestrictedShift":
-        cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.001, high=0.1)
+        cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.001, high=1.0)
         cfg_gloss_projection_head["init_zeroes"] = True
-        cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = trial.suggest_categorical("distinguish_gloss_context_embeddings", [True, False])
+        cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
 
     # distinguish_gloss_context_embeddings is effective for "SHARED" setting.
