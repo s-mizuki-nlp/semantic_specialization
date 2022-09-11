@@ -128,23 +128,19 @@ class NormRestrictedShift(nn.Module):
 
     def forward(self, x, is_gloss_embeddings: bool = None):
         z = self._ffn.forward(x, is_gloss_embeddings)
-        # transform to [-1, 1]
-        # NOTE: shoud we replace with tanh?
-        dx = 2. * torch.sigmoid(z) - 1.
-        if self._max_l2_norm_value is not None:
-            # epsilon: (1,)
-            epsilon = self._max_l2_norm_value / np.sqrt(self._ffn._n_dim_in)
-        elif self._max_l2_norm_ratio is not None:
-            # epsilon: (n,*,1)
-            epsilon = self._max_l2_norm_ratio * torch.linalg.norm(x, ord=2, dim=-1, keepdim=True)
-
-        y = x + epsilon * dx
+        y = x + z
 
         return y
 
     def predict(self, x, is_gloss_embeddings: bool = None):
         with torch.no_grad():
             return self.forward(x, is_gloss_embeddings)
+
+    def max_l2_norm_value(self):
+        return self._max_l2_norm_value
+
+    def max_l2_norm_ratio(self):
+        return self._max_l2_norm_ratio
 
 
 class Identity(nn.Module):

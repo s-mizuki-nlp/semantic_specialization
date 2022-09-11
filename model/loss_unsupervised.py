@@ -104,3 +104,8 @@ class MaxPoolingMarginLoss(L._Loss):
         losses = torch.maximum(torch.zeros_like(vec_sim_topk_mean), self._max_margin - vec_sim_topk_mean)
 
         return _reduction(losses, self.reduction)
+
+def l2_dist_loss(x: torch.Tensor, y: torch.Tensor):
+    assert x.size() == y.size(), f"dimension size mismatch."
+    l2_dists = torch.sqrt(torch.sum((x-y)**2, axis=-1))
+    return torch.mean(l2_dists)
