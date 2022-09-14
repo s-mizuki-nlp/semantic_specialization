@@ -73,7 +73,7 @@ def objective(trial: optuna.Trial):
     # max-pool margin task に関する条件付け．
     dict_args["coef_max_pool_margin_loss"] = trial.suggest_float("coef_max_pool_margin_loss", low=0.1, high=1.0)
     dict_args["cfg_max_pool_margin_loss"] = {
-        "label_threshold": trial.suggest_discrete_uniform("label_threshold", low=0.0, high=0.9, q=0.1),
+        "label_threshold": trial.suggest_discrete_uniform("label_threshold", low=0.0, high=0.1, q=0.01),
         "top_k": 1
     }
 
