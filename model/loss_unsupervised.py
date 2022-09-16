@@ -101,5 +101,11 @@ class MaxPoolingMarginLoss(L._Loss):
 
         # loss = 1.0 - negative top-k similarity as long as
         losses = (1.0 - vec_sim_max) * is_valid_sample + 1.0 * (is_valid_sample == False)
+        n_samples = max(1, is_valid_sample.sum().item())
 
-        return _reduction(losses, self.reduction)
+        if self.reduction == "mean":
+            return torch.sum(losses) / n_samples
+        elif self.reduction == "sum":
+            return torch.sum(losses)
+        elif self.reduction == "none":
+            return losses
