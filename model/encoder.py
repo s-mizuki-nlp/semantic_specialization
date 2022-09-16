@@ -146,7 +146,7 @@ class NormRestrictedShift(nn.Module):
         # normalize length
         # mat_l2_norm: (n_batch,*,1)
         mat_l2_norm = torch.linalg.norm(x, ord=2, dim=-1, keepdim=True)
-        x_norm = x / mat_l2_norm
+        x_norm = x / mat_l2_norm.clamp(1E-6)
 
         # x -> z
         # z: (n_batch,*,n_dim_in)
