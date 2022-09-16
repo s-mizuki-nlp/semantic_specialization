@@ -307,7 +307,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         context_projection_head = gloss_projection_head
     elif context_projection_head_name == "COPY":
         warnings.warn(f"context_projection_head will be initialized with same parameters as gloss_projection_head.")
-        context_projection_head = copy.deepcopy(gloss_projection_head)
+        context_projection_head = CLASS(n_dim_in=gloss_dataset.n_dim, **args.cfg_gloss_projection_head)
+        context_projection_head.load_state_dict(gloss_projection_head.state_dict())
     else:
         assert context_projection_head_name in _encoder_classes, f"invalid encoder class name: {context_projection_head_name}"
         CLASS = _encoder_classes[context_projection_head_name]
