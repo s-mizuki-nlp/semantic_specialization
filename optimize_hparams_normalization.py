@@ -55,7 +55,7 @@ def objective(trial: optuna.Trial):
     dict_args["cfg_optimizer"] = {
         "class_name": "Adam",
         "lr": 0.001,
-        "weight_decay": 1E-5,
+        "weight_decay": 1E-7,
     }
 
     # contrastive task に関する条件付け
@@ -88,7 +88,7 @@ def objective(trial: optuna.Trial):
     # gloss projection head configuration
     cfg_gloss_projection_head = {}
     cfg_gloss_projection_head["n_layer"] = 2
-    cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.01, high=0.3)
+    cfg_gloss_projection_head["max_l2_norm_ratio"] = trial.suggest_loguniform("max_l2_norm_ratio", low=0.01, high=1.0)
     cfg_gloss_projection_head["init_zeroes"] = True
     cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
