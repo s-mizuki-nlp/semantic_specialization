@@ -104,7 +104,8 @@ def _default_configs():
         },
         "cfg_optimizer": {
             "lr":0.001,
-            "class_name":"Adam"
+            "class_name":"Adam",
+            "weight_decay":None,
         },
         "cfg_trainer": {
             # "accumulate_grad_batches":None,
