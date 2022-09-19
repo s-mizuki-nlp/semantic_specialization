@@ -9,8 +9,6 @@ import io, math, copy
 import numpy as np
 import torch
 from torch import nn
-import geotorch
-import torch.nn.functional
 
 class MultiLayerPerceptron(nn.Module):
 
@@ -22,7 +20,6 @@ class MultiLayerPerceptron(nn.Module):
                  bias: bool = False,
                  init_zeroes: bool = False,
                  distinguish_gloss_context_embeddings: bool = False,
-                 orthogonality_constraint: bool = False,
                  **kwargs):
         """
         multi-layer dense neural network with artibrary activation function
@@ -44,7 +41,6 @@ class MultiLayerPerceptron(nn.Module):
         self._n_dim_out = n_dim_out
         self._bias = bias
         self._distinguish_gloss_context_embeddings = distinguish_gloss_context_embeddings
-        self._orthogonality_constraint = orthogonality_constraint
         self._lst_dense = []
         if distinguish_gloss_context_embeddings:
             embedding_dim = kwargs.get("embedding_dim", None)
@@ -58,8 +54,6 @@ class MultiLayerPerceptron(nn.Module):
             n_in = n_dim_in+embedding_dim if k==0 else n_dim_hidden
             n_out = n_dim_out if k==(n_layer - 1) else n_dim_hidden
             dense_layer = nn.Linear(n_in, n_out, bias=bias)
-            if orthogonality_constraint:
-                geotorch.orthogonal(dense_layer, tensor_name="weight")
             if init_zeroes:
                 nn.init.uniform_(dense_layer.weight, -1/math.sqrt(n_in*1000), 1/math.sqrt(n_in*1000))
             self._lst_dense.append(dense_layer)
@@ -101,7 +95,7 @@ class NormRestrictedShift(nn.Module):
     def __init__(self, n_dim_in: int,
                  n_layer: Optional[int] = 2,
                  n_dim_hidden: Optional[int] = None,
-                 activation_function = torch.nn.functional.gelu,
+                 activation_function = torch.relu,
                  max_l2_norm_value: Optional[float] = None,
                  max_l2_norm_ratio: Optional[float] = None,
                  init_zeroes: bool = False,
@@ -118,57 +112,38 @@ class NormRestrictedShift(nn.Module):
         :param max_l2_norm_ratio: maximum relative L2 norm value of shift vector relative to input vector.
         :param n_dim_hidden: MLP hidden layer dimension size
         :param n_layer: MLP number of layers
-        :param activation_function: MLP activation function. e.g. torch.nn.functional.gelu. We recommend GeLU.
-        :param init_zeroes: initialize shifts with very small values. i.e., initial output will be almost identical to original value.
+        :param activation_function: MLP activation function. e.g. torch.relu
+        :param init_zeroes: initialize MLP with very small values. i.e., initial shift will be almost zero.
         """
         super().__init__()
 
-        assert distinguish_gloss_context_embeddings == False, f"we don't support distinguish_gloss_context_embeddings=True."
         assert (max_l2_norm_value is not None) or (max_l2_norm_ratio is not None), f"either `max_l2_norm_value` or `max_l2_norm_ratio` must be specified."
         assert (max_l2_norm_value is None) or (max_l2_norm_ratio is None), f"you can't specify both `max_l2_norm_value` and `max_l2_norm_ratio` simultaneously."
 
-        # contraction layer: y = f(x) where ||y|| <= ||x||
-        self._rotation = MultiLayerPerceptron(n_dim_in=n_dim_in, n_dim_out=n_dim_in, n_dim_hidden=n_dim_hidden, n_layer=n_layer,
-                                              activation_function=activation_function, bias=bias, init_zeroes=False,
-                                              orthogonality_constraint=True,
-                                              distinguish_gloss_context_embeddings=distinguish_gloss_context_embeddings)
-        # scaling layer: z = g(x) where z \in R
-        self._scaling = MultiLayerPerceptron(n_dim_in=n_dim_in, n_dim_out=1, n_dim_hidden=n_dim_hidden, n_layer=n_layer,
-                                             activation_function=activation_function, bias=bias, init_zeroes=False,
-                                             orthogonality_constraint=False,
-                                             distinguish_gloss_context_embeddings=distinguish_gloss_context_embeddings)
-
-        self._init_zeroes = init_zeroes
+        self._ffn = MultiLayerPerceptron(n_dim_in=n_dim_in, n_dim_out=n_dim_in, n_dim_hidden=n_dim_hidden, n_layer=n_layer,
+                                         activation_function=activation_function, bias=bias, init_zeroes=init_zeroes,
+                                         distinguish_gloss_context_embeddings=distinguish_gloss_context_embeddings)
         self._max_l2_norm_value = max_l2_norm_value
         self._max_l2_norm_ratio = max_l2_norm_ratio
 
     def forward(self, x, is_gloss_embeddings: bool = None):
-        # normalize length
-        # mat_l2_norm: (n_batch,*,1)
-        mat_l2_norm = torch.linalg.norm(x, ord=2, dim=-1, keepdim=True)
-        x_norm = x / mat_l2_norm.clamp(1E-6)
+        z = self._ffn.forward(x, is_gloss_embeddings)
 
-        # x -> z
-        # z: (n_batch,*,n_dim_in)
-        z = self._rotation.forward(x_norm, is_gloss_embeddings=False)
-        # x -> \rho
-        # rho: (n_batch,*,1), rho[n,*,1] \in (0,1)
-        v = self._scaling(x, is_gloss_embeddings=False)
-        if self._init_zeroes:
-            v = v - 4.0
-        rho = torch.sigmoid(v)
+        # limit l2-norm up to 1.0
+        # z_norm = ||z||
+        z_norm = torch.linalg.norm(z, ord=2, dim=-1, keepdim=True)
+        # z_denom = 1.0 if ||z|| < 1.0 else ||z||
+        z_denom = torch.maximum(torch.ones_like(z_norm, dtype=torch.float), z_norm)
 
         if self._max_l2_norm_value is not None:
             # epsilon: (1,)
             epsilon = self._max_l2_norm_value
         elif self._max_l2_norm_ratio is not None:
             # epsilon: (n,*,1)
-            epsilon = self._max_l2_norm_ratio * mat_l2_norm
+            epsilon = self._max_l2_norm_ratio * torch.linalg.norm(x, ord=2, dim=-1, keepdim=True)
 
-        # let \lambda as either max_l2_norm_ratio,
-        # \delta = \lambda * ||x||_2 * \rho(x) * f(\hat x)
-        # therefore, ||\delta||_2 <= \lambda * ||x||_2
-        dx = epsilon * rho * z
+        # dx = \epsilon * ||x|| * z / max(1.0, ||z||)
+        dx = epsilon * z / z_denom
         y = x + dx
 
         return y
