@@ -112,8 +112,8 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
             _ = self._gloss_projection_head.to(device=torch.device("cpu"))
             _ = self._context_projection_head.to(device=torch.device("cpu"))
         # save model dump
-        checkpoint["gloss_projection_head_dump"] = pickle.dumps(self._gloss_projection_head.state_dict())
-        checkpoint["context_projection_head_dump"] = pickle.dumps(self._context_projection_head.state_dict())
+        checkpoint["gloss_projection_head_dump"] = pickle.dumps(self._gloss_projection_head)
+        checkpoint["context_projection_head_dump"] = pickle.dumps(self._context_projection_head)
         # then revert back if necessary.
         if device != torch.device("cpu"):
             # revert to original device (probably cuda).
