@@ -67,8 +67,6 @@ class MaxPoolingMarginLoss(L._Loss):
                  size_average=None, reduce=None, reduction: str = "mean"):
         super().__init__(size_average, reduce, reduction)
 
-        assert top_k == 1, f"`top_k` must be one: {top_k}"
-
         self._similarity = CosineSimilarity(temperature=1.0) if similarity_module is None else similarity_module
         self._label_threshold = label_threshold
         self._top_k = top_k
@@ -88,8 +86,16 @@ class MaxPoolingMarginLoss(L._Loss):
         # fill -inf with masked positions
         mask_tensor = _create_mask_tensor(num_target_samples)
         mat_sim = mat_sim.masked_fill_(mask_tensor, value=-float("inf"))
-        # vec_sim_max: (n,); maximum similarity for each query.
-        vec_sim_max, _ = torch.max(mat_sim, dim=-1)
+        # vec_sim_topk: (n,); top-k average similarity for each query.
+        if self._top_k == 1:
+            vec_sim_topk, _ = torch.max(mat_sim, dim=-1)
+        else:
+            mat_sim_topk, _ = torch.topk(mat_sim, k=self._top_k)
+            # replace invalid elements with zeroes
+            mat_sim_topk = mat_sim_topk.masked_fill_(mask_tensor[:, :self._top_k], value=0.0)
+            # take top-k average while number of target samples into account.
+            t_denom = self._top_k - mask_tensor[:, :self._top_k].sum(dim=-1)
+            vec_sim_topk = mat_sim_topk.sum(dim=-1) / t_denom
 
         # compare the threshold with similarity diff. between top-1 and top-2.
         # dummy elements are masked by -inf, then it naturally exceeds threshold = regarded as valid example.
@@ -97,10 +103,10 @@ class MaxPoolingMarginLoss(L._Loss):
             obj = torch.topk(mat_sim, k=2, largest=True)
             is_valid_sample = (obj.values[:,0] - obj.values[:,1]) > self._label_threshold
         else:
-            is_valid_sample = torch.ones_like(vec_sim_max).type(torch.bool)
+            is_valid_sample = torch.ones_like(vec_sim_topk).type(torch.bool)
 
         # loss = 1.0 - negative top-k similarity as long as
-        losses = (1.0 - vec_sim_max) * is_valid_sample + 1.0 * (is_valid_sample == False)
+        losses = (1.0 - vec_sim_topk) * is_valid_sample + 1.0 * (is_valid_sample == False)
         n_samples = max(1, is_valid_sample.sum().item())
 
         if self.reduction == "mean":
