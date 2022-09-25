@@ -63,12 +63,13 @@ class PairwiseSimilarityPreservationLoss(L._Loss):
 class MaxPoolingMarginLoss(L._Loss):
 
     def __init__(self, similarity_module: Optional[torch.nn.Module] = None,
-                 label_threshold: float = 0.0, top_k: int = 1,
+                 min_threshold: float = 0.01, max_threshold: float = 0.1, top_k: int = 1,
                  size_average=None, reduce=None, reduction: str = "mean"):
         super().__init__(size_average, reduce, reduction)
 
         self._similarity = CosineSimilarity(temperature=1.0) if similarity_module is None else similarity_module
-        self._label_threshold = label_threshold
+        self._min_threshold = min_threshold
+        self._max_threshold = max_threshold
         self._top_k = top_k
         self._size_average = size_average
         self._reduce = reduce
@@ -100,18 +101,15 @@ class MaxPoolingMarginLoss(L._Loss):
         # compare the threshold with similarity diff. between top-1 and top-2.
         # dummy elements are masked by -inf, then it naturally exceeds threshold = regarded as valid example.
         if mat_sim.shape[-1] > 1:
+            n_samples = mat_sim.shape[0]
             obj = torch.topk(mat_sim, k=2, largest=True)
-            is_valid_sample = (obj.values[:,0] - obj.values[:,1]) > self._label_threshold
+            # th \in [t_min, t_max]; th = \rho_1 - rho_2
+            vec_thresholds = (obj.values[:,0] - obj.values[:,1]).clamp(min=self._min_threshold, max=self._max_threshold)
+            vec_weights = vec_thresholds * n_samples / torch.sum(vec_thresholds)
         else:
-            is_valid_sample = torch.ones_like(vec_sim_topk).type(torch.bool)
+            vec_weights = torch.ones_like(vec_sim_topk, dtype=torch.float)
 
-        # loss = 1.0 - negative top-k similarity as long as
-        losses = (1.0 - vec_sim_topk) * is_valid_sample + 1.0 * (is_valid_sample == False)
-        n_samples = max(1, is_valid_sample.sum().item())
+        # loss_i = w_i * (1.0 - \rho_1)
+        losses = (1.0 - vec_sim_topk) * vec_weights
 
-        if self.reduction == "mean":
-            return torch.sum(losses) / n_samples
-        elif self.reduction == "sum":
-            return torch.sum(losses)
-        elif self.reduction == "none":
-            return losses
+        return _reduction(losses, self.reduction)
