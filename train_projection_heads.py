@@ -99,7 +99,8 @@ def _default_configs():
         },
         "cfg_max_pool_margin_loss": {
             "similarity_module": None, # default: cosine_similarity
-            "label_threshold": 0.0,
+            "min_threshold": 0.01,
+            "max_threshold": 0.1,
             "top_k": 1
         },
         "cfg_optimizer": {
