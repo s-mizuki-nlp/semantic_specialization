@@ -20,7 +20,7 @@
   "context_dataset_name": "SemCor+OMSTI-bert-large-cased",
   "coef_max_pool_margin_loss": 0.2,
   "cfg_max_pool_margin_loss": {
-    "label_threshold": 0.0,
+    "label_threshold": 0.04,
     "top_k": 1
   },
   "gloss_projection_head_name": "NormRestrictedShift",
