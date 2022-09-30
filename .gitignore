@@ -7,6 +7,7 @@ experiment_results/
 copy_checkpoints_from_remote.sh
 _cache/
 optimize_hparams_exec_commands.sh
+figures/
 
 # IDE
 .idea/

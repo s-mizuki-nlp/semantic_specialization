@@ -63,14 +63,12 @@ class PairwiseSimilarityPreservationLoss(L._Loss):
 class MaxPoolingMarginLoss(L._Loss):
 
     def __init__(self, similarity_module: Optional[torch.nn.Module] = None,
-                 max_margin: float = 0.7, top_k: int = 1,
+                 label_threshold: float = 0.0, top_k: int = 1,
                  size_average=None, reduce=None, reduction: str = "mean"):
         super().__init__(size_average, reduce, reduction)
 
-        assert top_k > 0, f"`top_k` must be positive integer: {top_k}"
-
         self._similarity = CosineSimilarity(temperature=1.0) if similarity_module is None else similarity_module
-        self._max_margin = max_margin
+        self._label_threshold = label_threshold
         self._top_k = top_k
         self._size_average = size_average
         self._reduce = reduce
@@ -88,24 +86,32 @@ class MaxPoolingMarginLoss(L._Loss):
         # fill -inf with masked positions
         mask_tensor = _create_mask_tensor(num_target_samples)
         mat_sim = mat_sim.masked_fill_(mask_tensor, value=-float("inf"))
-        # vec_sim_max: (n,); maximum similarity for each query.
+        # vec_sim_topk: (n,); top-k average similarity for each query.
         if self._top_k == 1:
-            vec_sim_topk_mean, _ = torch.max(mat_sim, dim=-1)
+            vec_sim_topk, _ = torch.max(mat_sim, dim=-1)
         else:
             mat_sim_topk, _ = torch.topk(mat_sim, k=self._top_k)
             # replace invalid elements with zeroes
-            mat_sim_topk = mat_sim_topk.masked_fill_(mask_tensor[:,:self._top_k], value=0.0)
+            mat_sim_topk = mat_sim_topk.masked_fill_(mask_tensor[:, :self._top_k], value=0.0)
             # take top-k average while number of target samples into account.
-            t_denom = self._top_k - mask_tensor[:,:self._top_k].sum(dim=-1)
-            vec_sim_topk_mean = mat_sim_topk.sum(dim=-1) / t_denom
+            t_denom = self._top_k - mask_tensor[:, :self._top_k].sum(dim=-1)
+            vec_sim_topk = mat_sim_topk.sum(dim=-1) / t_denom
 
-        # hinge loss
-        # targets: (n,). targets[i] = 0; ground-truth (=positive) class index is always zero.
-        losses = torch.maximum(torch.zeros_like(vec_sim_topk_mean), self._max_margin - vec_sim_topk_mean)
+        # compare the threshold with similarity diff. between top-1 and top-2.
+        # dummy elements are masked by -inf, then it naturally exceeds threshold = regarded as valid example.
+        if mat_sim.shape[-1] > 1:
+            obj = torch.topk(mat_sim, k=2, largest=True)
+            is_valid_sample = (obj.values[:,0] - obj.values[:,1]) > self._label_threshold
+        else:
+            is_valid_sample = torch.ones_like(vec_sim_topk).type(torch.bool)
 
-        return _reduction(losses, self.reduction)
+        # loss = 1.0 - negative top-k similarity as long as
+        losses = (1.0 - vec_sim_topk) * is_valid_sample + 1.0 * (is_valid_sample == False)
+        n_samples = max(1, is_valid_sample.sum().item())
 
-def l2_dist_loss(x: torch.Tensor, y: torch.Tensor):
-    assert x.size() == y.size(), f"dimension size mismatch."
-    l2_dists = torch.sqrt(torch.sum((x-y)**2, axis=-1))
-    return torch.mean(l2_dists)
+        if self.reduction == "mean":
+            return torch.sum(losses) / n_samples
+        elif self.reduction == "sum":
+            return torch.sum(losses)
+        elif self.reduction == "none":
+            return losses
