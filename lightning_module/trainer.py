@@ -22,7 +22,7 @@ from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset, BERTLemmaEmbedd
 from evaluator.wsd_knn import FrozenBERTKNNWSDTaskEvaluator
 
 from model.loss import ContrastiveLoss, TripletLoss
-from model.loss_unsupervised import MaxPoolingMarginLoss, l2_dist_loss
+from model.loss_unsupervised import MaxPoolingMarginLoss
 from model.utils import pairwise_cosine_similarity, batch_pairwise_cosine_similarity
 from custom.optimizer import AdamWithWarmup
 
@@ -213,17 +213,9 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         else:
             loss = loss_function.forward(queries=_query, positives=_positive, negatives=_hard_negatives, num_negative_samples=num_hard_negatives)
 
-        # l2 distance loss
-        loss_l2 = l2_dist_loss(query, _query)
-        loss_l2 = loss_l2 + l2_dist_loss(positive, _positive)
-        if hard_negatives is not None:
-            loss_l2 = loss_l2 + l2_dist_loss(hard_negatives, _hard_negatives)
-
         if loss_function.__class__.__name__ == "TripletLoss":
             # multiply 100x so that similar scale to contrastive loss.
             loss = loss * 100
-
-        loss = loss + loss_l2 * projection_head.max_l2_norm_ratio()
 
         return loss
 
@@ -238,12 +230,6 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         _targets = gloss_projection_head(targets, is_gloss_embeddings=True)
 
         loss = loss_function.forward(queries=_query, targets=_targets, num_target_samples=num_targets)
-
-        # l2 distance loss
-        loss_l2 = l2_dist_loss(query, _query) * context_projection_head.max_l2_norm_ratio()
-        loss_l2 = loss_l2 + l2_dist_loss(targets, _targets) * gloss_projection_head.max_l2_norm_ratio()
-        loss = loss + loss_l2
-
         return loss
 
     def _forward_supervised_alignment_task(self, gloss_projection_head: nn.Module, context_projection_head: nn.Module, loss_function: ContrastiveLoss,
