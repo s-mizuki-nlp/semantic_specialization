@@ -139,7 +139,7 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--sense_annotated_dataset_name", required=False, type=nullable_string, default=None, help="Sense-annotated corpus embeddings dataset name. Specifying it enables supervised alignment task.")
     parser.add_argument("--coef_supervised_alignment_loss", required=False, type=float, default=1.0, help="Coefficient of supervised alignment task.")
 
-    parser.add_argument("--main_loss_class_name", required=False, type=str, default="ContrastiveLoss", choices=["ContrastiveLoss", "TripletLoss"],
+    parser.add_argument("--main_loss_class_name", required=False, type=str, default="ContrastiveLoss", choices=["ContrastiveLoss", "TripletLoss", "None"],
                         help="main loss class name for gloss embeddings specialization.")
     parser.add_argument("--similarity_class_name", required=False, type=str, default="CosineSimilarity", choices=["CosineSimilarity", "DotProductSimilarity", "ArcMarginProduct"],
                         help="similarity class for {contrastive, supervised alignment} tasks.")
@@ -328,6 +328,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         main_loss = ContrastiveLoss(similarity_module=similarity_module, use_positives_as_in_batch_negatives=args.use_positives_as_in_batch_negatives)
     elif args.main_loss_class_name == "TripletLoss":
         main_loss = TripletLoss(margin=args.triplet_loss_margin, use_positives_as_in_batch_negatives=args.use_positives_as_in_batch_negatives)
+    elif args.main_loss_class_name == "None":
+        main_loss = None
     else:
         raise ValueError(f"invalid main_loss_class_name: {args.main_loss_class_name}")
 

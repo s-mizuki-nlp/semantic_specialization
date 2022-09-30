@@ -10,6 +10,7 @@
   "cfg_similarity_class": {
     "temperature": 0.015625
   },
+  "main_loss_class_name": "ContrastiveLoss",
   "batch_size": 256,
   "cfg_contrastive_learning_dataset": {
     "semantic_relation_for_positives": "all-relations",

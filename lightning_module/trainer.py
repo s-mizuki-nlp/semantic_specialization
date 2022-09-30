@@ -199,8 +199,11 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                 if verbose:
                     print(f"{loss_name}.{property_name}: {current_value:.2f} -> {new_value:.2f}")
 
-    def _forward_contrastive_or_triplet_task(self, projection_head: nn.Module, loss_function: Union[ContrastiveLoss, TripletLoss],
+    def _forward_contrastive_or_triplet_task(self, projection_head: nn.Module, loss_function: Union[ContrastiveLoss, TripletLoss, None],
                                              query, positive, hard_negatives, num_hard_negatives):
+        if loss_function is None:
+            return torch.tensor(0.0, dtype=torch.float, device=query.device)
+
         _query = projection_head(query, is_gloss_embeddings=True)
         _positive = projection_head(positive, is_gloss_embeddings=True)
         _hard_negatives = None if hard_negatives is None else projection_head(hard_negatives, is_gloss_embeddings=True)
@@ -216,8 +219,11 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
         return loss
 
-    def _forward_max_pool_margin_task(self, gloss_projection_head: nn.Module, context_projection_head: nn.Module, loss_function: MaxPoolingMarginLoss,
+    def _forward_max_pool_margin_task(self, gloss_projection_head: nn.Module, context_projection_head: nn.Module, loss_function: Union[MaxPoolingMarginLoss, None],
                                       query, targets, num_targets):
+        if loss_function is None:
+            return torch.tensor(0.0, dtype=torch.float, device=query.device)
+
         # query: in-context entity embeddings of a text.
         _query = context_projection_head(query, is_gloss_embeddings=False)
         # targets: all candidate sense (=lemma key) embeddings for the query word (=lemma&pos pair).
@@ -228,6 +234,9 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
     def _forward_supervised_alignment_task(self, gloss_projection_head: nn.Module, context_projection_head: nn.Module, loss_function: ContrastiveLoss,
                                            query, positive, negatives, num_negatives):
+        if loss_function is None:
+            return torch.tensor(0.0, dtype=torch.float, device=query.device)
+
         # query: in-context entity embeddings of a text.
         _query = context_projection_head(query, is_gloss_embeddings=False)
         # positive: ground-truth sense (=lemma key) embeddings for the query word.
