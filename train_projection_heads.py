@@ -83,6 +83,7 @@ def _default_configs():
         "max_l2_norm_ratio": 0.5,
         "init_zeroes": True,
         "distinguish_gloss_context_embeddings": False,
+        "constraint_type": "element_wise"
     }
 
     dict_defaults = {

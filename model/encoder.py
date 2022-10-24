@@ -20,6 +20,7 @@ class MultiLayerPerceptron(nn.Module):
                  bias: bool = False,
                  init_zeroes: bool = False,
                  distinguish_gloss_context_embeddings: bool = False,
+                 apply_spectral_normalization: bool = False,
                  **kwargs):
         """
         multi-layer dense neural network with artibrary activation function
@@ -30,6 +31,7 @@ class MultiLayerPerceptron(nn.Module):
         :param n_dim_hidden: hidden layer dimension size. DEFAULT: n_dim_in
         :param n_layer: number of layers. DEFAULT: 2
         :param activation_function: activation function. e.g. torch.relu
+        :param apply_spectral_normalization: performs spectral normalization on feed-forward layer weights.
         """
         super().__init__()
 
@@ -56,6 +58,8 @@ class MultiLayerPerceptron(nn.Module):
             dense_layer = nn.Linear(n_in, n_out, bias=bias)
             if init_zeroes:
                 nn.init.uniform_(dense_layer.weight, -1/math.sqrt(n_in*1000), 1/math.sqrt(n_in*1000))
+            if apply_spectral_normalization:
+                dense_layer = nn.utils.spectral_norm(dense_layer)
             self._lst_dense.append(dense_layer)
         self._activation = activation_function
         self._layers = nn.ModuleList(self._lst_dense)
@@ -96,6 +100,7 @@ class NormRestrictedShift(nn.Module):
                  n_layer: Optional[int] = 2,
                  n_dim_hidden: Optional[int] = None,
                  activation_function = torch.relu,
+                 constraint_type: str = "element_wise",
                  max_l2_norm_value: Optional[float] = None,
                  max_l2_norm_ratio: Optional[float] = None,
                  init_zeroes: bool = False,
@@ -105,10 +110,20 @@ class NormRestrictedShift(nn.Module):
         """
         this module shifts input vector up to max L2 norm.
         let x as input, d as number of dimensions, \sigma as sigmoid function, F(x) as the multi-layer perceptron, output will be written as follows.
-        output = x + \epsilon (2 \sigma(F(x)) - 1); \epsilon = max_l2_norm / \sqr{d}
+
+        constraint_type == "element_wise":
+            output = x + \max_l2_norm_ratio * ||x|| * (2 \sigma(F(x)) - 1);
+        constraint_type == "l2":
+            ^hat F(x) = F(x) / max(1, ||F(x)||)
+            output = x + \max_l2_norm_ratio * ||x|| * \hat F(x);
+        constraint_type == "spectral":
+            F(x) = FFNN(x) with spectral norm constraint
+            output = x + \max_l2_norm_value * F(x);
+        constraint_type == "none":
+            output = x + F(x);
 
         :param n_dim_in: input dimension size
-        :param max_l2_norm_value: maximum absolute L2 norm value of shift vector.
+        :param max_l2_norm_value: maximum absolute L2 norm value of shift vector. available for constraint_type == "spectral" only.
         :param max_l2_norm_ratio: maximum relative L2 norm value of shift vector relative to input vector.
         :param n_dim_hidden: MLP hidden layer dimension size
         :param n_layer: MLP number of layers
@@ -117,28 +132,67 @@ class NormRestrictedShift(nn.Module):
         """
         super().__init__()
 
-        assert (max_l2_norm_value is not None) or (max_l2_norm_ratio is not None), f"either `max_l2_norm_value` or `max_l2_norm_ratio` must be specified."
-        assert (max_l2_norm_value is None) or (max_l2_norm_ratio is None), f"you can't specify both `max_l2_norm_value` and `max_l2_norm_ratio` simultaneously."
+        if constraint_type not in self.CONSTRAINT_TYPES():
+            raise ValueError(f"invalid `constraint_type` value. available values are: {self.CONSTRAINT_TYPES()}")
+
+        if constraint_type in ("element_wise", "l2"):
+            apply_spectral_normalization = False
+            assert max_l2_norm_ratio is not None, f"you must specify `max_l2_norm_ratio` argument."
+        elif constraint_type in ("spectral",):
+            apply_spectral_normalization = True
+            assert max_l2_norm_value is not None, f"you must specify `max_l2_norm_value` argument."
+        elif constraint_type in ("none",):
+            apply_spectral_normalization = False
+            if (max_l2_norm_ratio is not None) or (max_l2_norm_value is not None):
+                warnings.warn("`max_l2_norm_{value,ratio}` is ignored.")
 
         self._ffn = MultiLayerPerceptron(n_dim_in=n_dim_in, n_dim_out=n_dim_in, n_dim_hidden=n_dim_hidden, n_layer=n_layer,
                                          activation_function=activation_function, bias=bias, init_zeroes=init_zeroes,
-                                         distinguish_gloss_context_embeddings=distinguish_gloss_context_embeddings)
+                                         distinguish_gloss_context_embeddings=distinguish_gloss_context_embeddings,
+                                         apply_spectral_normalization=apply_spectral_normalization)
+
+        self._constraint_type = constraint_type
         self._max_l2_norm_value = max_l2_norm_value
         self._max_l2_norm_ratio = max_l2_norm_ratio
 
+    @classmethod
+    def CONSTRAINT_TYPES(cls):
+        return ("element_wise", "l2", "spectral", "none")
+
     def forward(self, x, is_gloss_embeddings: bool = None):
         z = self._ffn.forward(x, is_gloss_embeddings)
-        # transform to [-1, 1]
-        # NOTE: shoud we replace with tanh?
-        dx = 2. * torch.sigmoid(z) - 1.
-        if self._max_l2_norm_value is not None:
-            # epsilon: (1,)
-            epsilon = self._max_l2_norm_value / np.sqrt(self._ffn._n_dim_in)
-        elif self._max_l2_norm_ratio is not None:
+
+        # limit l2-norm up to 1.0
+        if self._constraint_type == "l2":
+            # z_norm = ||z||: (n, 1)
+            z_norm = torch.linalg.norm(z, ord=2, dim=-1, keepdim=True)
+            # z_denom = 1.0 if ||z|| < 1.0 else ||z||: (n, 1)
+            z_denom = torch.maximum(torch.ones_like(z_norm, dtype=torch.float), z_norm)
             # epsilon: (n,*,1)
             epsilon = self._max_l2_norm_ratio * torch.linalg.norm(x, ord=2, dim=-1, keepdim=True)
+            # dx = \max_l2_norm_ratio * ||x|| * z / max(1.0, ||z||)
+            dx = epsilon * z / z_denom
 
-        y = x + epsilon * dx
+        # transform to [-1, 1]
+        elif self._constraint_type == "element_wise":
+            # NOTE: shoud we replace with tanh?
+            z_dash = 2. * torch.sigmoid(z) - 1.
+            # epsilon: (n,*,1)
+            epsilon = self._max_l2_norm_ratio * torch.linalg.norm(x, ord=2, dim=-1, keepdim=True)
+            # dx = \max_l2_norm_ratio * ||x|| * (2 \sigma(z) -1)
+            dx = epsilon * z_dash
+
+        # bound Lipschitz constant of residual function < 1.
+        elif self._constraint_type == "spectral":
+            # dx = \max_l2_norm_value * F(x)
+            dx = self._max_l2_norm_value * z
+
+        # no constraint.
+        elif self._constraint_type == "none":
+            # dx = F(x)
+            dx = z
+
+        y = x + dx
 
         return y
 

@@ -30,6 +30,7 @@
     "n_layer": 2,
     "max_l2_norm_ratio": 0.015,
     "init_zeroes": true,
-    "distinguish_gloss_context_embeddings": false
+    "distinguish_gloss_context_embeddings": false,
+    "constraint_type": "element_wise"
   }
 }
