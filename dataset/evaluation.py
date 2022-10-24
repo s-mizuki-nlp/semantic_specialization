@@ -4,6 +4,7 @@ import copy
 import io, os, json
 from typing import Union, Collection, Optional, Dict, Any, Iterable, Callable, List
 from torch.utils.data import Dataset
+from nltk.tokenize import WordPunctTokenizer
 
 import xml.etree.ElementTree
 import bs4.element
@@ -525,3 +526,94 @@ class WordInContextDataset(Dataset):
             "transform_functions": self._transform_functions
         }
         return ret
+
+
+class MultilingualWordInContextDataset(WordInContextDataset):
+
+    def __init__(self, path_corpus: str,
+                 path_ground_truth_labels: Optional[str] = None,
+                 transform_functions = None,
+                 filter_function: Optional[Union[Callable, List[Callable]]] = None,
+                 entity_filter_function: Optional[Union[Callable, List[Callable]]] = None,
+                 description: str = ""):
+
+        """
+        MLC-WiC Dataset[Martelli+, 2021]を読み込むクラス
+
+        [Martelli+, 2021] SemEval-2021 Task 2: Multilingual and Cross-lingual Word-in-Context Disambiguation (MCL-WiC)
+        https://github.com/SapienzaNLP/mcl-wic
+
+        :param path_corpos: コーパス（文ペア）のパス (`{training,dev,test}.{LANG-PAIR}.data`)
+        :param path_ground_truth_labels: 正解ラベルのパス(`{training,dev}.{LANG-PAIR}.gold`)
+        :param transform_functions: データ変形定義，Dictionaryを指定．keyはフィールド名，valueは変形用関数
+        :param filter_function: 除外するか否かを判定する関数
+        :param description: 説明
+        """
+        super().__init__(path_corpus=path_corpus, path_ground_truth_labels=path_ground_truth_labels, transform_functions=transform_functions,
+                         filter_function=filter_function, entity_filter_function=entity_filter_function, description=description)
+
+    def char_range_to_word_position(self, sentence: str, char_start_idx: int, char_end_idx: int,
+                                    tokenizer: Callable[[str], List[str]] = None):
+
+        # [Verified] MLC-WiC character position is compatible with the tokenization of WordPunctTokenizer.
+        if tokenizer is None:
+            tokenizer = WordPunctTokenizer()
+
+        lst_tokens = tokenizer.tokenize(sentence)
+        lst_token_spans = list(tokenizer.span_tokenize(sentence))
+
+        word_idx_start = word_idx_end = None
+        for word_idx, (start_idx, end_idx) in enumerate(lst_token_spans):
+            if start_idx == char_start_idx:
+                word_idx_start = word_idx
+            if end_idx == char_end_idx:
+                word_idx_end = word_idx + 1
+
+        expected = sentence[char_start_idx:char_end_idx]
+        actual = " ".join(lst_tokens[word_idx_start:word_idx_end])
+        assert expected == actual, f"failed to detect word span. expected <> actual: {expected} <> {actual}"
+
+        return (word_idx_start, word_idx_end)
+
+    def _sentence_loader(self, path_corpus: str, path_ground_truth_labels: Optional[str] = None) -> Iterable[Dict[str, Any]]:
+        tokenizer = WordPunctTokenizer()
+
+        with io.open(path_corpus, mode="r") as ifs:
+            lst_examples = json.load(ifs)
+        if path_ground_truth_labels is not None:
+            with io.open(path_ground_truth_labels, mode="r") as ifs:
+                lst_gold_labels = json.load(ifs)
+        else:
+            lst_gold_labels = [None]*len(lst_examples)
+
+        map_gold_label = {"F": False, "T": True}
+        for dict_example, dict_gold_label in zip(lst_examples, lst_gold_labels):
+            assert dict_example["id"] == dict_gold_label["id"], f"id mismatch detected: {dict_example['id']}"
+
+            gold_label = None if dict_gold_label is None else map_gold_label[dict_gold_label["tag"]]
+
+            word_span_s1 = self.char_range_to_word_position(sentence=dict_example["sentence1"],
+                                                                char_start_idx=int(dict_example["start1"]), char_end_idx=int(dict_example["end1"]),
+                                                                tokenizer=tokenizer)
+            word_span_s2 = self.char_range_to_word_position(sentence=dict_example["sentence2"],
+                                                                char_start_idx=int(dict_example["start2"]),
+                                                                char_end_idx=int(dict_example["end2"]),
+                                                                tokenizer=tokenizer)
+            lst_word_spans = [word_span_s1, word_span_s2]
+            for word_span, sentence in zip(lst_word_spans,
+                                               [dict_example["sentence1"], dict_example["sentence2"]]):
+                lst_tokens = tokenizer.tokenize(sentence)
+                dict_sentence = {
+                    "sentence_pair_id": dict_example["id"],
+                    "ground_truth_label": gold_label,
+                    "tokenized_sentence": " ".join(lst_tokens),
+                    "words": lst_tokens,
+                    "entities": [
+                        {"span": list(word_span),
+                         "lemma": dict_example["lemma"].lower(),
+                         "pos_orig": dict_example["pos"],
+                         "pos": utils_wordnet.universal_tagset_to_wordnet_tagset(dict_example["pos"])
+                         }
+                    ]
+                }
+                yield dict_sentence
