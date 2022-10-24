@@ -67,9 +67,8 @@ def objective(trial: optuna.Trial):
 
     # max-pool margin task に関する条件付け．
     dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.1, high=1.0)
-    max_margin = 1.0 # trial.suggest_discrete_uniform("max_margin", low=0.5, high=1.0, q=0.1)
     top_k = 1
-    dict_args["cfg_max_pool_margin_loss"] = {"max_margin": max_margin, "top_k": top_k}
+    dict_args["cfg_max_pool_margin_loss"] = {"top_k": top_k}
 
     # gloss/context projection head
     gloss_projection_head_name = "NormRestrictedShift"
