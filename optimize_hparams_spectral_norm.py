@@ -66,7 +66,7 @@ def objective(trial: optuna.Trial):
             return 0.0
 
     # max-pool margin task に関する条件付け．
-    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.1, high=1.0)
+    dict_args["coef_max_pool_margin_loss"] = 0.2
     top_k = 1
     dict_args["cfg_max_pool_margin_loss"] = {"top_k": top_k}
 
