@@ -153,6 +153,11 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
     @classmethod
     def fix_missing_attributes(cls, model, model_name: Optional[str] = None):
+        # d0c797: NormRestrictedShift._constraint_type DEFAULT: element_wise
+        if model.__class__.__name__ == "NormRestrictedShift":
+            if getattr(model, "_constraint_type", None) is None:
+                setattr(model, "_constraint_type", "element_wise")
+
         return model
 
     def _update_model_parameters(self, current_step: Optional[float] = None, verbose: bool = False):
