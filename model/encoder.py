@@ -162,7 +162,8 @@ class NormRestrictedShift(nn.Module):
     def forward(self, x, is_gloss_embeddings: bool = None):
         # normalize to unit vector
         if self._constraint_type == "spectral":
-            x = x / torch.linalg.norm(x, ord=2, dim=-1, keepdim=True)
+            x_norm = torch.linalg.norm(x, ord=2, dim=-1, keepdim=True).clamp(min=1E-7)
+            x = x / x_norm
 
         z = self._ffn.forward(x, is_gloss_embeddings)
 
