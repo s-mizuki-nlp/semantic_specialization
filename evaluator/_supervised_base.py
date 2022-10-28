@@ -112,6 +112,10 @@ class BaseEvaluatorByRaganato(BaseEvaluator):
         dict_ret = super().macro_average(lst_dict_metrics)
 
         n_ = len(lst_dict_metrics)
+
+        # NOTE:
+        # f1_score_by_raganato = [Raganato+, EACL2017] = micro-F1 score
+        # When you predict single sene for each instance, micro-F1 score is equal to accuracy = precision = recall.
         dict_ret["recall_by_raganato"] = dict_ret["precision"] * n_ / n_
         dict_ret["f1_score_by_raganato"] = self._calc_f1_score(prec=dict_ret["precision"], recall=dict_ret["recall_by_raganato"])
 
