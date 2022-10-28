@@ -160,6 +160,10 @@ class NormRestrictedShift(nn.Module):
         return ("element_wise", "l2", "spectral", "none")
 
     def forward(self, x, is_gloss_embeddings: bool = None):
+        # normalize to unit vector
+        if self._constraint_type == "spectral":
+            x = x / torch.linalg.norm(x, ord=2, dim=-1, keepdim=True)
+
         z = self._ffn.forward(x, is_gloss_embeddings)
 
         # limit l2-norm up to 1.0
