@@ -576,6 +576,7 @@ class MultilingualWordInContextDataset(WordInContextDataset):
         return (word_idx_start, word_idx_end)
 
     def _sentence_loader(self, path_corpus: str, path_ground_truth_labels: Optional[str] = None) -> Iterable[Dict[str, Any]]:
+        # [Verified] MLC-WiC character position is compatible with the tokenization of WordPunctTokenizer.
         tokenizer = WordPunctTokenizer()
 
         with io.open(path_corpus, mode="r") as ifs:
@@ -588,10 +589,13 @@ class MultilingualWordInContextDataset(WordInContextDataset):
 
         map_gold_label = {"F": False, "T": True}
         for dict_example, dict_gold_label in zip(lst_examples, lst_gold_labels):
-            assert dict_example["id"] == dict_gold_label["id"], f"id mismatch detected: {dict_example['id']}"
+            if dict_gold_label is None:
+                gold_label = None
+            else:
+                gold_label = map_gold_label[dict_gold_label["tag"]]
+                assert dict_example["id"] == dict_gold_label["id"], f"id mismatch detected: {dict_example['id']}"
 
-            gold_label = None if dict_gold_label is None else map_gold_label[dict_gold_label["tag"]]
-
+            # extract word span
             word_span_s1 = self.char_range_to_word_position(sentence=dict_example["sentence1"],
                                                                 char_start_idx=int(dict_example["start1"]), char_end_idx=int(dict_example["end1"]),
                                                                 tokenizer=tokenizer)
