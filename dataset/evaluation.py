@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 import copy
+import warnings
 import io, os, json
 from typing import Union, Collection, Optional, Dict, Any, Iterable, Callable, List
 from torch.utils.data import Dataset
@@ -333,7 +334,8 @@ class WordInContextDataset(Dataset):
                  transform_functions = None,
                  filter_function: Optional[Union[Callable, List[Callable]]] = None,
                  entity_filter_function: Optional[Union[Callable, List[Callable]]] = None,
-                 description: str = ""):
+                 description: str = "",
+                 **kwargs):
 
         """
         [Pilehvar+, 2019]が提供するWord-in-Context Datasetを読み込むクラス
@@ -373,7 +375,7 @@ class WordInContextDataset(Dataset):
 
         self._n_sample = None
 
-        self._raw_records = self._preload_sentences(path_corpus=path_corpus, path_ground_truth_labels=path_ground_truth_labels)
+        self._raw_records = self._preload_sentences(path_corpus=path_corpus, path_ground_truth_labels=path_ground_truth_labels, **kwargs)
         self._preprocessed_records = [record for record in self]
 
     def _load_ground_truth_labels(self, path: str):
@@ -385,7 +387,7 @@ class WordInContextDataset(Dataset):
                 dict_labels[key] = labels
         return dict_labels
 
-    def _sentence_loader(self, path_corpus: str, path_ground_truth_labels: Optional[str] = None) -> Iterable[Dict[str, Any]]:
+    def _sentence_loader(self, path_corpus: str, path_ground_truth_labels: Optional[str] = None, **kwargs) -> Iterable[Dict[str, Any]]:
 
         with io.open(path_corpus, mode="r") as ifs:
             lst_sentence_pairs = [sentence_pair.strip() for sentence_pair in ifs]
@@ -419,9 +421,9 @@ class WordInContextDataset(Dataset):
                 }
                 yield dict_sentence
 
-    def _preload_sentences(self, path_corpus: str, path_ground_truth_labels: str) -> List[Dict[str, Any]]:
+    def _preload_sentences(self, path_corpus: str, path_ground_truth_labels: str, **kwargs) -> List[Dict[str, Any]]:
         lst_sentences = []
-        for record in self._sentence_loader(path_corpus, path_ground_truth_labels):
+        for record in self._sentence_loader(path_corpus, path_ground_truth_labels, **kwargs):
             lst_sentences.append(record)
         return lst_sentences
 
@@ -532,6 +534,7 @@ class MultilingualWordInContextDataset(WordInContextDataset):
 
     def __init__(self, path_corpus: str,
                  path_ground_truth_labels: Optional[str] = None,
+                 fix_wrong_annotation: bool = False,
                  transform_functions = None,
                  filter_function: Optional[Union[Callable, List[Callable]]] = None,
                  entity_filter_function: Optional[Union[Callable, List[Callable]]] = None,
@@ -545,12 +548,68 @@ class MultilingualWordInContextDataset(WordInContextDataset):
 
         :param path_corpos: コーパス（文ペア）のパス (`{training,dev,test}.{LANG-PAIR}.data`)
         :param path_ground_truth_labels: 正解ラベルのパス(`{training,dev}.{LANG-PAIR}.gold`)
+        :param fix_wrong_annotation: Sense lookupを阻害する不正確な{lemma,pos}アノテーションを修正する
         :param transform_functions: データ変形定義，Dictionaryを指定．keyはフィールド名，valueは変形用関数
         :param filter_function: 除外するか否かを判定する関数
         :param description: 説明
         """
         super().__init__(path_corpus=path_corpus, path_ground_truth_labels=path_ground_truth_labels, transform_functions=transform_functions,
-                         filter_function=filter_function, entity_filter_function=entity_filter_function, description=description)
+                         filter_function=filter_function, entity_filter_function=entity_filter_function, description=description,
+                         fix_wrong_annotation=fix_wrong_annotation)
+
+    def fix_wrong_annotation(self, dict_example: Dict[str, str]):
+        dict_wrong_annotations = {
+            "training.en-en.674": {
+                "attribute": "lemma",
+                "incorrect": "disturbed",
+                "correct": "disturb",
+            },
+            "training.en-en.675": {
+                "attribute": "lemma",
+                "incorrect": "disturbed",
+                "correct": "disturb",
+            },
+            "training.en-en.1026": {
+                "attribute": "lemma",
+                "incorrect": "strech",
+                "correct": "stretch"
+            },
+            "training.en-en.1027": {
+                "attribute": "lemma",
+                "incorrect": "strech",
+                "correct": "stretch"
+            },
+            "training.en-en.1748": {
+                "attribute": "pos",
+                "incorrect": "ADJ",
+                "correct": "NOUN"
+            },
+            "training.en-en.1749": {
+                "attribute": "pos",
+                "incorrect": "ADJ",
+                "correct": "NOUN"
+            },
+            "training.en-en.7428": {
+                "attribute": "lemma",
+                "incorrect": "motheaten",
+                "correct": "moth-eaten"
+            },
+            "training.en-en.7429": {
+                "attribute": "lemma",
+                "incorrect": "motheaten",
+                "correct": "moth-eaten"
+            }
+        }
+        if dict_example["id"] not in dict_wrong_annotations:
+            return dict_example
+        else:
+            dict_fix = dict_wrong_annotations[dict_example["id"]]
+            attribute = dict_fix["attribute"]
+            assert dict_example[attribute] == dict_fix["incorrect"], f"tried to apply wrong fix: {dict_example['id']}"
+            # replace incorrect one with correct one
+            dict_example[attribute] = dict_fix["correct"]
+            warnings.warn(f"fixed wrong annotation: {dict_fix}")
+            return dict_example
 
     def char_range_to_word_position(self, sentence: str, char_start_idx: int, char_end_idx: int,
                                     tokenizer: Callable[[str], List[str]] = None):
@@ -575,7 +634,8 @@ class MultilingualWordInContextDataset(WordInContextDataset):
 
         return (word_idx_start, word_idx_end)
 
-    def _sentence_loader(self, path_corpus: str, path_ground_truth_labels: Optional[str] = None) -> Iterable[Dict[str, Any]]:
+    def _sentence_loader(self, path_corpus: str, path_ground_truth_labels: Optional[str] = None,
+                         fix_wrong_annotation: bool = False, **kwargs) -> Iterable[Dict[str, Any]]:
         # [Verified] MLC-WiC character position is compatible with the tokenization of WordPunctTokenizer.
         tokenizer = WordPunctTokenizer()
 
@@ -589,6 +649,9 @@ class MultilingualWordInContextDataset(WordInContextDataset):
 
         map_gold_label = {"F": False, "T": True}
         for dict_example, dict_gold_label in zip(lst_examples, lst_gold_labels):
+            if fix_wrong_annotation:
+                dict_example = self.fix_wrong_annotation(dict_example)
+
             if dict_gold_label is None:
                 gold_label = None
             else:

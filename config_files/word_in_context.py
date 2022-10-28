@@ -27,7 +27,8 @@ cfg_corpus = {
     },
     "MCL-WiC-train": {
         "path_corpus": os.path.join(DIR_DATASET_MCL_WiC, "./training/training.en-en.data"),
-        "path_ground_truth_labels": os.path.join(DIR_DATASET_MCL_WiC, "./training/training.en-en.gold")
+        "path_ground_truth_labels": os.path.join(DIR_DATASET_MCL_WiC, "./training/training.en-en.gold"),
+        "fix_wrong_annotation": True,
     },
     "MCL-WiC-dev": {
         "path_corpus": os.path.join(DIR_DATASET_MCL_WiC, "./dev/multilingual/dev.en-en.data"),
