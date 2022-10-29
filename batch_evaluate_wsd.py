@@ -21,6 +21,7 @@ def _parse_args():
     parser.add_argument("--evaluation_notebook", required=True, type=str, help="path of the jupyter notebook for evaluation.")
     parser.add_argument("--output_summary", "-o", required=True, type=str, help="path of the summary output file.")
     parser.add_argument("--output_notebook", required=True, type=str, help="path of the jupyter notebook file. You can include parameter variables such as {version_no}")
+    parser.add_argument("--eval_dataset_name", required=False, type=str, default="WSDEval-ALL-bert-large-cased", help="Precomputed evaluation dataset embeddings name defined in: `config_files.sense_annotated_corpus.cfg_evaluation`")
     parser.add_argument("--env_name", required=True, type=str, help="environment name which is specified when training.")
     parser.add_argument("--version_no", "-v", required=True, type=str, help="version numbers to be evaluated. ex: '28,29:31,33'")
     parser.add_argument("--root_checkpoint_directory", required=True, type=str, help="root path of the pytorch lightning checkpoint root directory. e.g., ./checkpoints/")
@@ -54,6 +55,7 @@ def main():
 
         evaluation_parameters = {
             "root_checkpoint_directory": args.root_checkpoint_directory,
+            "eval_dataset_name": args.eval_dataset_name,
             "env_name": args.env_name,
             "version_no":version_no,
             "path_output_batch_execution":args.output_summary,
