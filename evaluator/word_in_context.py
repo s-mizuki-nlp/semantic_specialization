@@ -341,6 +341,8 @@ class WiCTaskByNNSenseSimilarityEvaluator(WordInContextTaskEvaluatorBase):
             sim = 1.0 if lemma_x == lemma_y else 0.0
         elif self._sense_similarity_metric == "wu_palmer":
             sim = wu_palmer_similarity_lemma_key_pair(lemma_key_x=lemma_x, lemma_key_y=lemma_y)
+            if sim is None:
+                sim = 0.0
 
         return sim
 
