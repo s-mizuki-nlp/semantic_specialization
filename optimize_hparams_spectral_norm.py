@@ -80,7 +80,7 @@ def objective(trial: optuna.Trial):
     cfg_gloss_projection_head = {}
     cfg_gloss_projection_head["n_layer"] = 2
     if gloss_projection_head_name == "NormRestrictedShift":
-        cfg_gloss_projection_head["max_l2_norm_value"] = trial.suggest_loguniform("max_l2_norm_value", low=0.001, high=1.0)
+        cfg_gloss_projection_head["max_l2_norm_value"] = trial.suggest_loguniform("max_l2_norm_value", low=0.01, high=10.0)
         cfg_gloss_projection_head["constraint_type"] = "spectral"
         cfg_gloss_projection_head["init_zeroes"] = False
         cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
