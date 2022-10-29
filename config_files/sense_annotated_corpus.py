@@ -15,6 +15,7 @@ from .utils import pick_first_available_path
 DIR_EVALSET = "/home/sakae/Windows/dataset/word_sense_disambiguation/WSD_Evaluation_Framework/Evaluation_Datasets/"
 DIR_EVALSET_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/WSD_Evaluation_Framework/bert_embeddings/"
 DIR_WSD_HARD_BENCHMARK = "/home/sakae/Windows/dataset/word_sense_disambiguation/wsd-hard-benchmark/wsd_hard_benchmark/"
+DIR_WSD_HARD_BENCHMARK_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/wsd-hard-benchmark/wsd_hard_benchmark/bert_embeddings/"
 
 DIR_TRAINSET = "/home/sakae/Windows/dataset/word_sense_disambiguation/WSD_Training_Corpora/"
 DIR_TRAINSET_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/WSD_Training_Corpora/SemCor/bert_embeddings/"
@@ -88,7 +89,42 @@ cfg_evaluation = {
         "path_ground_truth_labels": os.path.join(DIR_WSD_HARD_BENCHMARK, "./softEN/softEN.gold.key.txt"),
         "lookup_candidate_senses": True,
         "description": "The WSD hard benchmark [Maru+, ACL2022]: softEN: Complement of the hardEN subset."
-    }
+    },
+    "ALLamended-bert-large-cased": {
+        "path": os.path.join(DIR_WSD_HARD_BENCHMARK_EMBEDDINGS, "bert-large-cased_ALLamended.hdf5"),
+        "padding": False,
+        "max_sequence_length": None,
+        "filter_function":None,
+        "description": "BERT-large-cased for ALLamended dataset."
+    },
+    "S10amended-bert-large-cased": {
+        "path": os.path.join(DIR_WSD_HARD_BENCHMARK_EMBEDDINGS, "bert-large-cased_S10amended.hdf5"),
+        "padding": False,
+        "max_sequence_length": None,
+        "filter_function":None,
+        "description": "BERT-large-cased for S10amended dataset."
+    },
+    "42D-bert-large-cased": {
+        "path": os.path.join(DIR_WSD_HARD_BENCHMARK_EMBEDDINGS, "bert-large-cased_42D.hdf5"),
+        "padding": False,
+        "max_sequence_length": None,
+        "filter_function":None,
+        "description": "BERT-large-cased for 42D dataset."
+    },
+    "hardEN-bert-large-cased": {
+        "path": os.path.join(DIR_WSD_HARD_BENCHMARK_EMBEDDINGS, "bert-large-cased_hardEN.hdf5"),
+        "padding": False,
+        "max_sequence_length": None,
+        "filter_function":None,
+        "description": "BERT-large-cased for hardEN dataset."
+    },
+    "softEN-bert-large-cased": {
+        "path": os.path.join(DIR_WSD_HARD_BENCHMARK_EMBEDDINGS, "bert-large-cased_softEN.hdf5"),
+        "padding": False,
+        "max_sequence_length": None,
+        "filter_function":None,
+        "description": "BERT-large-cased for softEN dataset."
+    },
 }
 
 cfg_training = {
