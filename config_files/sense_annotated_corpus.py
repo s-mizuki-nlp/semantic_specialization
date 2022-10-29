@@ -14,6 +14,8 @@ from .utils import pick_first_available_path
 
 DIR_EVALSET = "/home/sakae/Windows/dataset/word_sense_disambiguation/WSD_Evaluation_Framework/Evaluation_Datasets/"
 DIR_EVALSET_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/WSD_Evaluation_Framework/bert_embeddings/"
+DIR_WSD_HARD_BENCHMARK = "/home/sakae/Windows/dataset/word_sense_disambiguation/wsd-hard-benchmark/wsd_hard_benchmark/"
+
 DIR_TRAINSET = "/home/sakae/Windows/dataset/word_sense_disambiguation/WSD_Training_Corpora/"
 DIR_TRAINSET_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/WSD_Training_Corpora/SemCor/bert_embeddings/"
 DIR_WORDNET_GLOSS = "/home/sakae/Windows/dataset/word_sense_disambiguation/wordnet_gloss_corpus/"
@@ -56,6 +58,36 @@ cfg_evaluation = {
         "max_sequence_length": None,
         "filter_function":None,
         "description": "WSD Evaluation Framework dataset [Raganato+, 2017] encoded by BERT-large-cased. Weighted avg between entity embeddigns and masked word embeddings."
+    },
+    "ALLamended": {
+        "path_corpus": os.path.join(DIR_WSD_HARD_BENCHMARK, "./ALLamended/ALLamended.data.xml"),
+        "path_ground_truth_labels": os.path.join(DIR_WSD_HARD_BENCHMARK, "./ALLamended/ALLamended.gold.key.txt"),
+        "lookup_candidate_senses": True,
+        "description": "The WSD hard benchmark [Maru+, ACL2022]: ALLamended subset: A revised and amended version of WSDEval-ALL."
+    },
+    "S10amended": {
+        "path_corpus": os.path.join(DIR_WSD_HARD_BENCHMARK, "./S10amended/S10amended.data.xml"),
+        "path_ground_truth_labels": os.path.join(DIR_WSD_HARD_BENCHMARK, "./S10amended/S10amended.gold.key.txt"),
+        "lookup_candidate_senses": True,
+        "description": "The WSD hard benchmark [Maru+, ACL2022]: SemEval-2010 (S10amended): A revised and amended version of SemEval-2010."
+    },
+    "42D": {
+        "path_corpus": os.path.join(DIR_WSD_HARD_BENCHMARK, "./42D/42D.data.xml"),
+        "path_ground_truth_labels": os.path.join(DIR_WSD_HARD_BENCHMARK, "./42D/42D.gold.key.txt"),
+        "lookup_candidate_senses": True,
+        "description": "The WSD hard benchmark [Maru+, ACL2022]: 42D: A novel challenge set for WSD, comprising difficult and out-of-domain words/senses."
+    },
+    "hardEN": {
+        "path_corpus": os.path.join(DIR_WSD_HARD_BENCHMARK, "./hardEN/hardEN.data.xml"),
+        "path_ground_truth_labels": os.path.join(DIR_WSD_HARD_BENCHMARK, "./hardEN/hardEN.gold.key.txt"),
+        "lookup_candidate_senses": True,
+        "description": "The WSD hard benchmark [Maru+, ACL2022]: hardEN: A 'hard' dataset built by including all the instances of ALLamended, SemEval-2010 and 42D that are disambiguated incorrectly by several state-of-the-art systems."
+    },
+    "softEN": {
+        "path_corpus": os.path.join(DIR_WSD_HARD_BENCHMARK, "./softEN/softEN.data.xml"),
+        "path_ground_truth_labels": os.path.join(DIR_WSD_HARD_BENCHMARK, "./softEN/softEN.gold.key.txt"),
+        "lookup_candidate_senses": True,
+        "description": "The WSD hard benchmark [Maru+, ACL2022]: softEN: Complement of the hardEN subset."
     }
 }
 
