@@ -20,6 +20,7 @@ from dataset.utils import tensor_to_numpy, numpy_to_tensor
 from dataset_preprocessor.utils_wordnet_gloss import wu_palmer_similarity_lemma_key_pair
 from model.encoder import NormRestrictedShift
 from model.similarity import CosineSimilarity
+from .wsd_heuristics import TryAgainMechanism, TryAgainMechanismWithCoarseSenseInventory
 
 
 class WordInContextTaskEvaluatorBase(object, metaclass=ABCMeta):
@@ -78,7 +79,7 @@ class WordInContextTaskEvaluatorBase(object, metaclass=ABCMeta):
                 "threshold_opt": threshold_opt,
                 "accuracy": dict_accuracy[threshold_opt]
             }
-            print("=== tureshold tuning ===")
+            print("=== threshold tuning ===")
             pprint(report)
 
         return threshold_opt
@@ -209,8 +210,11 @@ class WiCTaskByNNSenseSimilarityEvaluator(WordInContextTaskEvaluatorBase):
                  evaluation_dataset: WordInContextTaskDataset,
                  lemma_key_embeddings_dataset: SREFLemmaEmbeddingsDataset,
                  sense_similarity_metric: str,
+                 try_again_mechanism: bool = False,
                  gloss_projection_head: Optional[torch.nn.Module] = None,
                  context_projection_head: Optional[torch.nn.Module] = None,
+                 kwargs_try_again_mechanism: Optional[Dict] = None,
+                 device: Optional[str] = "cpu",
                  verbose: bool = False):
         """
         Evaluate Word-in-Context task using word / sentence similarity
@@ -247,6 +251,34 @@ class WiCTaskByNNSenseSimilarityEvaluator(WordInContextTaskEvaluatorBase):
                 self._apply_gloss_projection = False
 
         self._similarity_module = CosineSimilarity(temperature=1.0)
+
+        # try-again mechanism
+        if try_again_mechanism is None:
+            self._try_again_mechanism = None
+        elif isinstance(try_again_mechanism, (TryAgainMechanism, TryAgainMechanismWithCoarseSenseInventory)):
+            self._try_again_mechanism = try_again_mechanism
+        elif isinstance(try_again_mechanism, bool):
+            if try_again_mechanism:
+                if isinstance(kwargs_try_again_mechanism, dict):
+                    _cfg = kwargs_try_again_mechanism
+                else:
+                    _cfg = {
+                        "exclude_common_semantically_related_synsets": True,
+                        "lookup_first_lemma_sense_only": False,
+                        "average_similarity_in_synset": False,
+                        "exclude_oneselves_for_noun_and_verb": True,
+                        "do_not_fix_synset_degeneration_bug": False,
+                        "semantic_relation": "all-relations"
+                    }
+                self._try_again_mechanism = TryAgainMechanism(lemma_key_embeddings_dataset=lemma_key_embeddings_dataset,
+                                                              similarity_metric="cosine",
+                                                              device=device,
+                                                              verbose=verbose,
+                                                              **_cfg)
+            else:
+                self._try_again_mechanism = None
+        else:
+            raise ValueError(f"invalid `try_again_mechanism` argument: {type(try_again_mechanism)}")
 
     def get_candidate_lemmas_from_wordnet(self, str_lemma: str, pos: str) -> List[wn.lemma]:
         lst_lemmas = wn.lemmas(str_lemma, pos=pos)
@@ -329,6 +361,15 @@ class WiCTaskByNNSenseSimilarityEvaluator(WordInContextTaskEvaluatorBase):
         # calculate similarity
         t_sim_score = self._similarity_module(t_query_embeddings, t_candidate_lemma_key_embeddings)
         lst_scores = tensor_to_numpy(t_sim_score).tolist()
+
+        if self._try_again_mechanism is not None:
+            _lst_candidate_lemma_keys, lst_scores = self._try_again_mechanism.try_again_mechanism(
+                # vec_query_embedding: (n_dim,)
+                vec_query_embedding=tensor_to_numpy(t_query_embedding.squeeze(0)),
+                pos=pos,
+                lst_candidate_lemma_keys=lst_candidate_lemma_keys,
+                lst_candidate_similarities=lst_scores,
+                top_k_candidates=2)
 
         lst_predictions = self.return_top_k_lemma_keys(lst_candidate_lemmas, lst_scores, multiple_output=False)
         return lst_predictions[0]
