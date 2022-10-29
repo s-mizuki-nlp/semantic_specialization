@@ -82,12 +82,14 @@ cfg_evaluation = {
         "path_corpus": os.path.join(DIR_WSD_HARD_BENCHMARK, "./hardEN/hardEN.data.xml"),
         "path_ground_truth_labels": os.path.join(DIR_WSD_HARD_BENCHMARK, "./hardEN/hardEN.gold.key.txt"),
         "lookup_candidate_senses": True,
+        "filter_function": _no_entity_sentence_filter,
         "description": "The WSD hard benchmark [Maru+, ACL2022]: hardEN: A 'hard' dataset built by including all the instances of ALLamended, SemEval-2010 and 42D that are disambiguated incorrectly by several state-of-the-art systems."
     },
     "softEN": {
         "path_corpus": os.path.join(DIR_WSD_HARD_BENCHMARK, "./softEN/softEN.data.xml"),
         "path_ground_truth_labels": os.path.join(DIR_WSD_HARD_BENCHMARK, "./softEN/softEN.gold.key.txt"),
         "lookup_candidate_senses": True,
+        "filter_function": _no_entity_sentence_filter,
         "description": "The WSD hard benchmark [Maru+, ACL2022]: softEN: Complement of the hardEN subset."
     },
     "ALLamended-bert-large-cased": {
@@ -115,14 +117,12 @@ cfg_evaluation = {
         "path": os.path.join(DIR_WSD_HARD_BENCHMARK_EMBEDDINGS, "bert-large-cased_hardEN.hdf5"),
         "padding": False,
         "max_sequence_length": None,
-        "filter_function":None,
         "description": "BERT-large-cased for hardEN dataset."
     },
     "softEN-bert-large-cased": {
         "path": os.path.join(DIR_WSD_HARD_BENCHMARK_EMBEDDINGS, "bert-large-cased_softEN.hdf5"),
         "padding": False,
         "max_sequence_length": None,
-        "filter_function":None,
         "description": "BERT-large-cased for softEN dataset."
     },
 }
