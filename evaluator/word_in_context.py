@@ -363,9 +363,13 @@ class WiCTaskByNNSenseSimilarityEvaluator(WordInContextTaskEvaluatorBase):
         lst_scores = tensor_to_numpy(t_sim_score).tolist()
 
         if self._try_again_mechanism is not None:
+            if t_query_embedding.ndim == 1:
+                vec_query_embedding = tensor_to_numpy(t_query_embedding.unsqueeze(0))
+            else:
+                vec_query_embedding = tensor_to_numpy(t_query_embedding)
             _lst_candidate_lemma_keys, lst_scores = self._try_again_mechanism.try_again_mechanism(
                 # vec_query_embedding: (n_dim,)
-                vec_query_embedding=tensor_to_numpy(t_query_embedding.squeeze(0)),
+                vec_query_embedding=vec_query_embedding,
                 pos=pos,
                 lst_candidate_lemma_keys=lst_candidate_lemma_keys,
                 lst_candidate_similarities=lst_scores,
