@@ -82,10 +82,10 @@ def objective(trial: optuna.Trial):
     if gloss_projection_head_name in ("NormRestrictedShift", "StackedNormRestrictedShift"):
         cfg_gloss_projection_head["max_l2_norm_value"] = trial.suggest_loguniform("max_l2_norm_value", low=0.01, high=1.0)
         cfg_gloss_projection_head["constraint_type"] = "spectral"
-        cfg_gloss_projection_head["init_zeroes"] = False
+        cfg_gloss_projection_head["init_zeroes"] = True
         cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
     if gloss_projection_head_name == "StackedNormRestrictedShift":
-        cfg_gloss_projection_head["n_block"] = 4
+        cfg_gloss_projection_head["n_block"] = 6
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
 
     # distinguish_gloss_context_embeddings is effective for "SHARED" setting.
