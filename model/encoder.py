@@ -206,6 +206,44 @@ class NormRestrictedShift(nn.Module):
             return self.forward(x, is_gloss_embeddings)
 
 
+class StackedNormRestrictedShift(nn.Module):
+
+    def __init__(self, n_dim_in: int,
+                 n_block: int,
+                 n_layer: Optional[int] = 2,
+                 n_dim_hidden: Optional[int] = None,
+                 activation_function = torch.relu,
+                 constraint_type: str = "element_wise",
+                 max_l2_norm_value: Optional[float] = None,
+                 max_l2_norm_ratio: Optional[float] = None,
+                 init_zeroes: bool = False,
+                 bias: bool = False,
+                 distinguish_gloss_context_embeddings: bool = False,
+                 **kwargs):
+        super().__init__()
+
+        lst_blocks = []
+        for _ in range(n_block):
+            block = NormRestrictedShift(n_dim_in=n_dim_in, n_layer=n_layer, n_dim_hidden=n_dim_hidden,
+                                        activation_function=activation_function, constraint_type=constraint_type,
+                                        max_l2_norm_ratio=max_l2_norm_ratio, max_l2_norm_value=max_l2_norm_value,
+                                        init_zeroes=init_zeroes, bias=bias,
+                                        distinguish_gloss_context_embeddings=distinguish_gloss_context_embeddings,
+                                        **kwargs)
+            lst_blocks.append(block)
+        self._blocks = nn.ModuleList(lst_blocks)
+
+    def forward(self, x, is_gloss_embeddings: bool = None):
+        z = x
+        for block in self._blocks:
+            z = block.forward(x=z, is_gloss_embeddings=is_gloss_embeddings)
+        return z
+
+    def predict(self, x, is_gloss_embeddings: bool = None):
+        with torch.no_grad():
+            return self.forward(x, is_gloss_embeddings)
+
+
 class Identity(nn.Module):
 
     def __init__(self, assign_dummy_parameter: bool = False, **kwargs):
