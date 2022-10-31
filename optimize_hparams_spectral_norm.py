@@ -71,7 +71,7 @@ def objective(trial: optuna.Trial):
     dict_args["cfg_max_pool_margin_loss"] = {"top_k": top_k}
 
     # gloss/context projection head
-    gloss_projection_head_name = "NormRestrictedShift"
+    gloss_projection_head_name = "StackedNormRestrictedShift"
     context_projection_head_name = "COPY"
     dict_args["gloss_projection_head_name"] = gloss_projection_head_name
     dict_args["context_projection_head_name"] = context_projection_head_name
@@ -79,11 +79,13 @@ def objective(trial: optuna.Trial):
     # gloss projection head configuration
     cfg_gloss_projection_head = {}
     cfg_gloss_projection_head["n_layer"] = 2
-    if gloss_projection_head_name == "NormRestrictedShift":
-        cfg_gloss_projection_head["max_l2_norm_value"] = trial.suggest_loguniform("max_l2_norm_value", low=0.01, high=10.0)
+    if gloss_projection_head_name in ("NormRestrictedShift", "StackedNormRestrictedShift"):
+        cfg_gloss_projection_head["max_l2_norm_value"] = trial.suggest_loguniform("max_l2_norm_value", low=0.01, high=1.0)
         cfg_gloss_projection_head["constraint_type"] = "spectral"
         cfg_gloss_projection_head["init_zeroes"] = False
         cfg_gloss_projection_head["distinguish_gloss_context_embeddings"] = False
+    if gloss_projection_head_name == "StackedNormRestrictedShift":
+        cfg_gloss_projection_head["n_block"] = 6
     dict_args["cfg_gloss_projection_head"] = cfg_gloss_projection_head
 
     # distinguish_gloss_context_embeddings is effective for "SHARED" setting.

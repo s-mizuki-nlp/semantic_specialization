@@ -80,6 +80,7 @@ from model.loss_unsupervised import MaxPoolingMarginLoss
 def _default_configs():
     dict_default_projection_head = {
         "n_layer": 2,
+        "n_block": 6,
         "max_l2_norm_ratio": 0.5,
         "max_l2_norm_value": 0.5,
         "init_zeroes": True,
