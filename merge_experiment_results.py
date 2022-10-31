@@ -24,7 +24,7 @@ def fix_checkpoint_value(value: str, index: str):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="merge experiment results into single file.")
-    parser.add_argument("--input_dir", "-i", required=True, type = str, default = "./experiment_results/", help = "directory where result files are located.")
+    parser.add_argument("--input_glob", "-i", required=True, type = str, default = "./experiment_results/*.json*", help = "input files with glob expression.")
     parser.add_argument("--filename_to_evaluator", required=False, type=str, default="results_from_evaluator.jsonl", help="output filename for results from evaluator.")
     parser.add_argument("--filename_to_trainer", required=False, type=str, default="results_from_trainer.jsonl", help="output filename for results from trainer.")
 
@@ -35,13 +35,14 @@ if __name__ == "__main__":
         assert not os.path.exists(path), f"file already exists: {path}"
 
     lst_inputs = []
-    lst_inputs.extend(glob(os.path.join(args.input_dir, "./*.json")))
-    lst_inputs.extend(glob(os.path.join(args.input_dir, "./*.jsonl")))
+    lst_inputs.extend(glob(args.input_glob))
 
     assert len(lst_inputs) > 0, f"there is no experiment results."
 
     trainer_to_evaluator_metric = {}
     trainer_to_evaluator_metric["hp/wsd_eval_ALL"] = "ALL.f1_score_by_raganato"
+    trainer_to_evaluator_metric["hp/wsd_eval_ALL_micro_f1"] = "ALL.f1_score_by_raganato"
+    trainer_to_evaluator_metric["hp/wsd_eval_ALL_macro_f1"] = "ALL.f1_score"
     for pos in "NOUN,ADJ,VERB,ADV".split(","):
         trainer_metric = f"hp/wsd_eval_{pos}"
         eval_metric = f"pos_orig.{pos}.f1_score_by_raganato"
