@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 import os, sys, io
+import warnings
 import argparse
 import ast
 import itertools
@@ -27,11 +28,16 @@ def _parse_args():
     parser.add_argument("--root_checkpoint_directory", required=True, type=str, help="root path of the pytorch lightning checkpoint root directory. e.g., ./checkpoints/")
     parser.add_argument("--evaluation_arguments", required=False, type=str, default="{}", help="optional evaluation parameters. ex: '{\"cross_validation\":True}'")
     parser.add_argument("--device", required=False, type=str, default=None, help="device used for runnning pytorch script. e.g., 'cuda:1'")
+    parser.add_argument("--append_output", action="store_true", help="append output to existing file.")
     parser.add_argument("--verbose", action="store_true", help="output verbose.")
 
     args = parser.parse_args()
 
-    assert not os.path.exists(args.output_summary), f"specified path already exists: {args.output_summary}"
+    if os.path.exists(args.output_summary):
+        if args.append_output:
+            warnings.warn(f"specified path already exists. we will append results: {args.output_summary}")
+        else:
+            raise IOError(f"specified path already exists: {args.output_summary}")
 
     # parse evaluation arguments
     args.evaluation_arguments = ast.literal_eval(args.evaluation_arguments)
