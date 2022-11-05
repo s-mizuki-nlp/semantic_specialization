@@ -81,35 +81,42 @@ class BaseEvaluator(object):
         }
         return dict_ret
 
-    def macro_average(self, lst_dict_metrics: List[Dict[str, float]]) -> Dict[str, float]:
+    def macro_average(self, lst_dict_metrics: List[Dict[str, float]],
+                      lst_metric_names: List[str]) -> Dict[str, float]:
         dict_lst_metrics = defaultdict(list)
 
         for dict_metrics in lst_dict_metrics:
-            for metric, value in dict_metrics.items():
-                dict_lst_metrics[metric].append(value)
+            for metric_name in lst_metric_names:
+                dict_lst_metrics[metric_name].append(dict_metrics[metric_name])
 
-        dict_ret = {metric:np.mean(lst_values) for metric, lst_values in dict_lst_metrics.items()}
+        dict_ret = {metric:float(np.mean(lst_values)) for metric, lst_values in dict_lst_metrics.items()}
 
         return dict_ret
 
-    def macro_average_recursive(self, dict_lst_dict_metrics: Dict[str, Union[Dict, List]]) -> Dict[str, Dict[str, float]]:
+    def macro_average_recursive(self, dict_lst_dict_metrics: Dict[str, Union[Dict, List]],
+                                lst_metric_names: Optional[List[str]] = None) -> Dict[str, Dict[str, float]]:
+        if lst_metric_names is None:
+            lst_metric_names = "precision,recall,f1_score,accuracy".split(",")
         dict_ret = {}
         for key, values in dict_lst_dict_metrics.items():
             if isinstance(values, list):
-                dict_ret[key] = self.macro_average(values)
+                dict_ret[key] = self.macro_average(values, lst_metric_names=lst_metric_names)
             elif isinstance(values, Dict):
-                dict_ret[key] = self.macro_average_recursive(values)
+                dict_ret[key] = self.macro_average_recursive(values, lst_metric_names=lst_metric_names)
         return dict_ret
 
 
 class BaseEvaluatorByRaganato(BaseEvaluator):
 
-    def macro_average(self, lst_dict_metrics: List[Dict[str, float]]) -> Dict[str, float]:
+    def macro_average(self, lst_dict_metrics: List[Dict[str, float]],
+                      lst_metric_names: Optional[List[str]] = None) -> Dict[str, float]:
         """
         wrong implementation that is used by [Raganato+, 2017]
         source: http://lcl.uniroma1.it/wsdeval/data/WSD_Evaluation_Framework.zip -> Evaluation_Datasets/Scorer.java
         """
-        dict_ret = super().macro_average(lst_dict_metrics)
+        if lst_metric_names is None:
+            lst_metric_names = "precision,recall,f1_score,accuracy".split(",")
+        dict_ret = super().macro_average(lst_dict_metrics, lst_metric_names=lst_metric_names)
 
         n_ = len(lst_dict_metrics)
 
@@ -230,6 +237,10 @@ class WSDTaskEvaluatorBase(BaseEvaluatorByRaganato, metaclass=ABCMeta):
             predictions, prediction_scores = self.predict(inputs_for_predictor, **self.predict_kwargs)
             ground_truthes = inputs_for_evaluator[self._ground_truth_lemma_keys_field_name]
             dict_metrics = self.compute_metrics(ground_truthes, predictions)
+            # 2022-11-05: append predictions and ground-truthes for computing macro-average.
+            instance_id = inputs_for_evaluator["id"]
+            dict_metrics["predictions"] = { instance_id: predictions}
+            dict_metrics["ground_truthes"] = { instance_id: ground_truthes}
             yield inputs_for_predictor, inputs_for_evaluator, ground_truthes, predictions, prediction_scores, dict_metrics
 
     def __len__(self):
