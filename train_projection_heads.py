@@ -147,6 +147,7 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--similarity_class_name", required=False, type=str, default="CosineSimilarity", choices=["CosineSimilarity", "DotProductSimilarity", "ArcMarginProduct"],
                         help="similarity class for {contrastive, supervised alignment} tasks.")
     parser.add_argument("--use_positives_as_in_batch_negatives", required=False, type=bool, default=True, help="contrastive loss config. use positive examples as weak (=in-batch) negatives.")
+    parser.add_argument("--coef_for_hard_negatives", required=False, type=float, default=1.0, help="coefficient for hard negative examples. DEFAULT: 1.0 (=uniform weighting)")
     parser.add_argument("--triplet_loss_margin", required=False, type=float, default=0.0, help="triplet loss margin. takes affect only when main loss is triplet loss.")
     parser.add_argument("--log_every_n_steps", required=False, type=int, default=200)
     parser.add_argument("--val_check_interval", required=False, type=int, default=500)
@@ -328,7 +329,9 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
 
     ### main loss: Contrastive Loss OR Triplet Loss
     if args.main_loss_class_name == "ContrastiveLoss":
-        main_loss = ContrastiveLoss(similarity_module=similarity_module, use_positives_as_in_batch_negatives=args.use_positives_as_in_batch_negatives)
+        main_loss = ContrastiveLoss(similarity_module=similarity_module,
+                                    use_positives_as_in_batch_negatives=args.use_positives_as_in_batch_negatives,
+                                    coef_for_hard_negatives=args.coef_for_hard_negatives)
     elif args.main_loss_class_name == "TripletLoss":
         main_loss = TripletLoss(margin=args.triplet_loss_margin, use_positives_as_in_batch_negatives=args.use_positives_as_in_batch_negatives)
     elif args.main_loss_class_name == "None":
