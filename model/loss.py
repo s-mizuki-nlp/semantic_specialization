@@ -32,13 +32,17 @@ class ContrastiveLoss(L._Loss):
 
     def __init__(self, similarity_module: nn.Module,
                  use_positives_as_in_batch_negatives: bool = True,
+                 coef_for_hard_negatives: float = 1.0,
                  size_average=None, reduce=None, reduction: str = "mean"):
         super(ContrastiveLoss, self).__init__(size_average, reduce, reduction)
         self._similarity = similarity_module
         self._use_positives_as_in_batch_negatives = use_positives_as_in_batch_negatives
+        self._coef_for_hard_negatives = coef_for_hard_negatives
         self._size_average = size_average
         self._reduce = reduce
         self._reduction = reduction
+
+        assert coef_for_hard_negatives > 0, f"invalid value. `coef_for_hard_negatives` must be positive."
 
     def get_off_diagonal_elements(self, squared_tensor):
         n = squared_tensor.shape[0]
@@ -72,6 +76,7 @@ class ContrastiveLoss(L._Loss):
         # (optional) explicit negatives: (n, n_neg)
         if negatives is not None:
             mat_sim_neg_explicit = self._similarity(queries.unsqueeze(dim=1), negatives, is_hard_examples=False)
+            mat_sim_neg_explicit = np.log(self._coef_for_hard_negatives) + mat_sim_neg_explicit
         else:
             mat_sim_neg_explicit = None
 
