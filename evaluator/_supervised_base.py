@@ -18,6 +18,7 @@ from nltk.corpus import wordnet as wn
 from config_files.wsd_task import WSDTaskDataLoader
 from dataset import WSDTaskDataset
 from dataset_preprocessor import utils_wordnet_gloss
+from ._macro_metric import compute_macro_f1_score_by_maru
 
 class BaseEvaluator(object):
 
@@ -106,7 +107,7 @@ class BaseEvaluator(object):
         return dict_ret
 
 
-class BaseEvaluatorByRaganato(BaseEvaluator):
+class BaseEvaluatorByRaganatoAndMaru(BaseEvaluator):
 
     def macro_average(self, lst_dict_metrics: List[Dict[str, float]],
                       lst_metric_names: Optional[List[str]] = None) -> Dict[str, float]:
@@ -122,13 +123,26 @@ class BaseEvaluatorByRaganato(BaseEvaluator):
 
         # NOTE:
         # f1_score_by_raganato = [Raganato+, EACL2017] = micro-F1 score
-        # When you predict single sene for each instance, micro-F1 score is equal to accuracy = precision = recall.
+        # When you predict single sense for each instance, micro-F1 score is equal to accuracy = precision = recall.
         dict_ret["recall_by_raganato"] = dict_ret["precision"] * n_ / n_
         dict_ret["f1_score_by_raganato"] = self._calc_f1_score(prec=dict_ret["precision"], recall=dict_ret["recall_by_raganato"])
 
+        # NOTE:
+        # f1_score_by_maru = [Maru+, ACL2022] = sense-level Macro-F1 score
+        dict_predictions = {}
+        dict_ground_truthes = {}
+        for dict_metric in lst_dict_metrics:
+            dict_predictions.update(dict_metric["predictions"])
+            dict_ground_truthes.update(dict_metric["ground_truthes"])
+        dict_ret_macro = compute_macro_f1_score_by_maru(dict_ground_truthes=dict_ground_truthes, dict_predictions=dict_predictions,
+                                                        collection_evaluation_keys=None, strict=False)
+        dict_ret["macro_precision_by_maru"] = dict_ret_macro["precision"]
+        dict_ret["macro_recall_by_maru"] = dict_ret_macro["recall"]
+        dict_ret["macro_f1_score_by_maru"] = dict_ret_macro["f1_score"]
+
         return dict_ret
 
-class WSDTaskEvaluatorBase(BaseEvaluatorByRaganato, metaclass=ABCMeta):
+class WSDTaskEvaluatorBase(BaseEvaluatorByRaganatoAndMaru, metaclass=ABCMeta):
 
     def __init__(self,
                  evaluation_dataset: WSDTaskDataset,
