@@ -105,6 +105,9 @@ class WordNetGlossDataset(Dataset):
             for entity in record["entities"]:
                 tup_lemma_pos = (entity["lemma"], entity["pos"])
                 dict_lemma_and_pos[tup_lemma_pos].extend(entity["ground_truth_lemma_keys"])
+        # drop duplicates
+        for tup_lemma_pos in dict_lemma_and_pos.keys():
+            dict_lemma_and_pos[tup_lemma_pos] = list(set(dict_lemma_and_pos[tup_lemma_pos]))
 
         return dict_lemma_and_pos
 
