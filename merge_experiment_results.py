@@ -42,8 +42,8 @@ if __name__ == "__main__":
 
     trainer_to_evaluator_metric = {}
     trainer_to_evaluator_metric["hp/wsd_eval_ALL"] = "ALL.f1_score_by_raganato"
-    trainer_to_evaluator_metric["hp/wsd_eval_ALL_micro_f1"] = "ALL.f1_score_by_raganato"
-    trainer_to_evaluator_metric["hp/wsd_eval_ALL_macro_f1"] = "ALL.f1_score"
+    #trainer_to_evaluator_metric["hp/wsd_eval_ALL_micro_f1"] = "ALL.f1_score_by_raganato"
+    #trainer_to_evaluator_metric["hp/wsd_eval_ALL_macro_f1"] = "ALL.macro_f1_score_by_maru"
     for pos in "NOUN,ADJ,VERB,ADV".split(","):
         trainer_metric = f"hp/wsd_eval_{pos}"
         eval_metric = f"pos_orig.{pos}.f1_score_by_raganato"
