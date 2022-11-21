@@ -75,6 +75,7 @@ class ToWordNetPoSTagConverter(object):
 
         return lst_tokens
 
+
 class ToWordNetPoSTagAndLemmaConverter(ToWordNetPoSTagConverter):
 
     def __init__(self,
@@ -264,3 +265,52 @@ class FrequencyBasedMonosemousEntitySampler(object):
             "n_valid_lemma_and_pos_freq": self._export_freq_of_valid_lemma_pos()
         }
         return ret
+
+
+class WordNetPoSTagAndLemmaToEntityConverter(object):
+
+    def __init__(self, sense_inventory: "WordNetGlossCorpus"):
+        self._sense_inventory = sense_inventory
+
+    def __call__(self, lst_dict_tokens: List[Dict[str, str]]):
+        """
+        @param lst_dict_tokens: list of token dict like `[{'lemma': 'video', 'pos': 'n', "mwe_lemma":"video_game", "mwe_pos":"n"}]`
+        """
+
+        lst_entities = []
+        idx = 0
+
+        while idx < len(lst_dict_tokens):
+            dict_token = lst_dict_tokens[idx]
+
+            # Multi-word expression
+            if "mwe_pos" in dict_token:
+                lst_candidate_lemma_keys = self._sense_inventory.get_lemma_keys_by_lemma_and_pos(lemma=dict_token["mwe_lemma"], pos=dict_token["mwe_pos"])
+                if len(lst_candidate_lemma_keys) > 0:
+                    dict_entity = {
+                        "candidate_lemma_keys": lst_candidate_lemma_keys,
+                        "lemma": dict_token["mwe_lemma"],
+                        "pos": dict_token["mwe_pos"],
+                        "pos_orig": dict_token["mwe_pos_orig"],
+                        "span": dict_token["mwe_span"],
+                    }
+                    lst_entities.append(dict_entity)
+                    # jump to the end of MWE
+                    idx = dict_token["mwe_span"][1]
+                    continue
+
+            # Not MWE
+            lst_candidate_lemma_keys = self._sense_inventory.get_lemma_keys_by_lemma_and_pos(lemma=dict_token["lemma"], pos=dict_token["pos"])
+            if len(lst_candidate_lemma_keys) > 0:
+                dict_entity = {
+                    "candidate_lemma_keys": lst_candidate_lemma_keys,
+                    "lemma": dict_token["lemma"],
+                    "pos": dict_token["pos"],
+                    "pos_orig": dict_token["pos_orig"],
+                    "span": [idx, idx + 1]
+                }
+                lst_entities.append(dict_entity)
+
+            idx += 1
+
+        return lst_entities
