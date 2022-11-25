@@ -7,7 +7,9 @@ import h5py
 
 from torch.utils.data import IterableDataset, get_worker_info
 from ._base import AbstractFormatDataset
-from .encoder import convert_compressed_format_to_list_of_tensors
+from .encoder import convert_compressed_format_to_list_of_tensors, \
+    recover_full_context_embeddings_from_context_embeddings_in_entity, \
+    extract_entity_spans_from_record
 
 
 class BERTEmbeddingsBatchDataset(AbstractFormatDataset, IterableDataset):
@@ -18,6 +20,7 @@ class BERTEmbeddingsBatchDataset(AbstractFormatDataset, IterableDataset):
                  filter_function: Optional[Union[Callable, List[Callable]]] = None,
                  n_rows: Optional[int] = None,
                  return_record_only: bool = False,
+                 is_context_embeddings_in_entity_only: bool = False,
                  description: str = ""):
 
         super().__init__(path, transform_functions, filter_function, n_rows, description)
@@ -35,6 +38,7 @@ class BERTEmbeddingsBatchDataset(AbstractFormatDataset, IterableDataset):
         self._num_sentences = num_sentences
         self._n_dim = group["embeddings"].shape[-1]
         self._return_record_only = return_record_only
+        self._is_context_embeddings_in_entity_only = is_context_embeddings_in_entity_only
 
         ifs.close()
 
@@ -53,6 +57,20 @@ class BERTEmbeddingsBatchDataset(AbstractFormatDataset, IterableDataset):
             if not self._return_record_only:
                 record["embeddings"] = group["embeddings"][()]
                 record["sequence_lengths"] = group["sequence_lengths"][()]
+
+                # recover full-size context embeddings from context embeddings in entities.
+                if self._is_context_embeddings_in_entity_only:
+                    lst_lst_lst_entity_spans = [
+                        extract_entity_spans_from_record(
+                            record=r, entity_field_name="entities", span_field_name="subword_spans"
+                        )
+                        for r in record["records"]]
+                    context_embeddings_padded = recover_full_context_embeddings_from_context_embeddings_in_entity(
+                        context_embeddings_in_entity=record["embeddings"],
+                        lst_lst_lst_entity_spans=lst_lst_lst_entity_spans,
+                        sequence_lengths=record["sequence_lengths"]
+                    )
+                    record["embeddings"] = context_embeddings_padded
 
             yield record
 
@@ -81,9 +99,10 @@ class BERTEmbeddingsDataset(BERTEmbeddingsBatchDataset):
                  filter_function: Optional[Union[Callable, List[Callable]]] = None,
                  n_rows: Optional[int] = None,
                  return_record_only: bool = False,
+                 is_context_embeddings_in_entity_only: bool = False,
                  description: str = ""):
 
-        super().__init__(path, transform_functions, filter_function, n_rows, return_record_only, description)
+        super().__init__(path, transform_functions, filter_function, n_rows, return_record_only, is_context_embeddings_in_entity_only, description)
         self._padding = padding
         self._max_sequence_length = max_sequence_length
 

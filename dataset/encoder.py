@@ -392,3 +392,36 @@ def extract_entity_subword_embeddings(context_embeddings: Array_like,
     }
 
     return dict_ret
+
+
+def recover_full_context_embeddings_from_context_embeddings_in_entity(context_embeddings_in_entity: np.array,
+                                                                      lst_lst_lst_entity_spans: List[List[List[List[int]]]],
+                                                                      sequence_lengths: Iterable[int]) -> np.array:
+    n_dim = context_embeddings_in_entity.shape[0]
+    cursor = 0
+    lst_embeddings_padded = []
+    # entity span for a sentence
+    for idx, (lst_lst_entity_spans, seq_len) in enumerate(zip(lst_lst_lst_entity_spans, sequence_lengths)):
+        _embeddings_padded = np.zeros((seq_len, n_dim), dtype=np.float32)
+        # word span for a entity
+        for lst_entity_spans in lst_lst_entity_spans:
+            # subword span for a word
+            for entity_span in lst_entity_spans:
+                assert len(entity_span) == 2, f"invalid entity span."
+                n_subwords = entity_span[1] - entity_span[0]
+                # copy entity embeddings
+                _embeddings_padded[slice(*entity_span), :] = context_embeddings_in_entity[cursor:(cursor + n_subwords), :]
+                # forward cursor
+                cursor += n_subwords
+
+        lst_embeddings_padded.append(_embeddings_padded)
+
+    context_embeddings_padded = np.vstack(lst_embeddings_padded)
+
+    msg_err = "failed to recover zero-padded embeddings."
+    if cursor != context_embeddings_in_entity.shape[0]:
+        raise ValueError(msg_err)
+    if sum(sequence_lengths) != context_embeddings_padded.shape[0]:
+        raise ValueError(msg_err)
+
+    return context_embeddings_padded
