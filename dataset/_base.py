@@ -87,8 +87,14 @@ class AbstractFormatDataset(metaclass=ABCMeta):
         if self._transform_functions is None:
             return entry
 
-        for field_name, transform_function in self._transform_functions.items():
-            entry[field_name] = transform_function(entry[field_name])
+        for target_field_name, transform_function_or_dict in self._transform_functions.items():
+            if isinstance(transform_function_or_dict, dict):
+                transform_function = transform_function_or_dict["function"]
+                source_field_name = transform_function_or_dict["source_field_name"]
+            else:
+                transform_function = transform_function_or_dict
+                source_field_name = target_field_name
+            entry[target_field_name] = transform_function(entry[source_field_name])
 
         return entry
 
