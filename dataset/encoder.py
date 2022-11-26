@@ -16,6 +16,7 @@ class BERTEmbeddings(object):
                  layers: List[int] = [-4,-3,-2,-1],
                  return_compressed_format: bool = True,
                  return_numpy_array: bool = False,
+                 return_context_embeddings_in_entity_only: bool = False,
                  ignore_too_long_sequence: bool = False,
                  device_ids: Optional[List[int]] = None,
                  **kwargs):
@@ -32,6 +33,7 @@ class BERTEmbeddings(object):
         self._hidden_size = self._model.config.hidden_size
         self._return_compressed_format = return_compressed_format
         self._return_numpy_array = return_numpy_array
+        self._return_context_embeddings_in_entity_only = return_context_embeddings_in_entity_only
         self._ignore_too_long_sequence = ignore_too_long_sequence
 
         self._device_ids = device_ids
@@ -243,6 +245,13 @@ class BERTEmbeddings(object):
             if not self._return_compressed_format:
                 embeddings = embeddings[0]
 
+        if self._return_context_embeddings_in_entity_only:
+            embeddings = extract_context_embeddings_in_entity_from_full_context_embeddings(
+                context_embeddings=embeddings,
+                lst_lst_lst_entity_spans=lst_lst_entity_subword_spans,
+                sequence_lengths=v_seq_length
+            )
+
         dict_ret = {
             "embeddings": embeddings,
             "sequence_lengths": v_seq_length,
@@ -392,6 +401,34 @@ def extract_entity_subword_embeddings(context_embeddings: Array_like,
     }
 
     return dict_ret
+
+
+def extract_context_embeddings_in_entity_from_full_context_embeddings(context_embeddings: Array_like,
+                                                                      lst_lst_lst_entity_spans: List[List[List[Tuple[int, int]]]],
+                                                                      sequence_lengths: Iterable[int]
+                                                                      ) -> Array_like:
+    is_input_tensor = torch.is_tensor(context_embeddings)
+    context_embeddings = tensor_to_numpy(context_embeddings)
+
+    # extract context embeddings in entity spans only.
+    _lst_embeddings = []
+    cursor = 0
+    # entity spans for a sentence with seq_len length.
+    for lst_lst_entity_spans, seq_len in zip(lst_lst_lst_entity_spans, sequence_lengths):
+        # word spans for a entity
+        for lst_entity_spans in lst_lst_entity_spans:
+            # subword span for a word
+            for entity_span in lst_entity_spans:
+                _embeddings = context_embeddings[cursor:(cursor + seq_len), :][slice(*entity_span), :]
+                _lst_embeddings.append(_embeddings)
+        cursor += seq_len
+
+    embeddings_in_entity = np.vstack(_lst_embeddings)
+
+    if is_input_tensor:
+        embeddings_in_entity = numpy_to_tensor(embeddings_in_entity)
+
+    return embeddings_in_entity
 
 
 def recover_full_context_embeddings_from_context_embeddings_in_entity(context_embeddings_in_entity: np.array,
