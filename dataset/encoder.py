@@ -434,7 +434,7 @@ def extract_context_embeddings_in_entity_from_full_context_embeddings(context_em
 def recover_full_context_embeddings_from_context_embeddings_in_entity(context_embeddings_in_entity: np.array,
                                                                       lst_lst_lst_entity_spans: List[List[List[List[int]]]],
                                                                       sequence_lengths: Iterable[int]) -> np.array:
-    n_dim = context_embeddings_in_entity.shape[0]
+    n_dim = context_embeddings_in_entity.shape[1]
     cursor = 0
     lst_embeddings_padded = []
     # entity span for a sentence
