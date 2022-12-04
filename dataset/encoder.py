@@ -246,6 +246,11 @@ class BERTEmbeddings(object):
                 embeddings = embeddings[0]
 
         if self._return_context_embeddings_in_entity_only:
+            entity_span_avg_vectors = batch_calc_entity_subwords_average_vectors(batch_context_embeddings=embeddings,
+                                                                                 lst_lst_lst_entity_spans=lst_lst_entity_subword_spans,
+                                                                                 sequence_lengths=v_seq_length
+                                                                                 )
+
             embeddings = extract_context_embeddings_in_entity_from_full_context_embeddings(
                 context_embeddings=embeddings,
                 lst_lst_lst_entity_spans=lst_lst_entity_subword_spans,
@@ -254,6 +259,7 @@ class BERTEmbeddings(object):
 
         dict_ret = {
             "embeddings": embeddings,
+            "entity_span_avg_vectors": entity_span_avg_vectors,
             "sequence_lengths": v_seq_length,
             "sequence_spans": v_seq_spans,
             "entity_spans": lst_lst_entity_subword_spans,
@@ -355,6 +361,39 @@ def calc_entity_subwords_average_vectors(context_embeddings: Array_like,
         lst_entity_vectors.append(entity_vector)
 
     return lst_entity_vectors
+
+def batch_calc_entity_subwords_average_vectors(batch_context_embeddings: Array_like,
+                                         lst_lst_lst_entity_spans: List[List[List[Tuple[int, int]]]],
+                                         sequence_lengths: Iterable[int]
+                                         ) -> List[List[torch.Tensor]]:
+    """
+    for each entity in a sentence, we average context embeddings in the entity span.
+
+    Args:
+        batch_context_embeddings: batch (=sequences) of the context embeddings: compressed format.
+        lst_lst_lst_entity_spans: batch of the list of the list of subword spans of entities.
+        sequence_lengths: iterable of the sequence lengths (=number of subwords).
+
+    Returns: batch of the list of entity vectors.
+
+    """
+    is_input_tensor = torch.is_tensor(batch_context_embeddings)
+    batch_context_embeddings = tensor_to_numpy(batch_context_embeddings)
+
+    # for each entity, average context embeddings in the entity span.
+    lst_lst_vectors = []
+    cursor = 0
+    # entity spans for a sentence with seq_len length.
+    for lst_lst_entity_spans, seq_len in zip(lst_lst_lst_entity_spans, sequence_lengths):
+        # for a specific sequence, extract context embedding.
+        _context_embeddings = batch_context_embeddings[cursor:(cursor+seq_len),:]
+        lst_entity_vectors = calc_entity_subwords_average_vectors(context_embeddings=_context_embeddings,
+                                                                  lst_lst_entity_subword_spans=lst_lst_entity_spans)
+        if not is_input_tensor:
+            lst_entity_vectors = list(map(tensor_to_numpy, lst_entity_vectors))
+        lst_lst_vectors.append(lst_entity_vectors)
+
+    return lst_lst_vectors
 
 def extract_entity_subword_embeddings(context_embeddings: Array_like,
                                       lst_lst_entity_subword_spans: List[List[Tuple[int, int]]],
