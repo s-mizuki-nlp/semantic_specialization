@@ -3,18 +3,17 @@
 
 import sys, io, os
 from .utils import pick_first_available_path
-from dataset.filter import EmptyFilter, SequenceLengthFilter
-from dataset.deprecated import FrequencyBasedMonosemousEntitySampler
+from dataset.filter import EmptyFilter
+from dataset.transform import SenseFrequencyBasedEntitySampler
 
 DIR_CORPUS = "/home/sakae/Windows/dataset/word_sense_disambiguation/raw_text_corpus/"
 DIR_EMBEDDINGS = os.path.join(DIR_CORPUS, "./bert_embeddings/")
 DIR_LOCAL = "/tmp/sakae/"
 
 # We use NDJSONDataset class
-# we also recommend EmptyFilter, SequenceLengthFilter, and FrequencyBasedMonosemousEntitySampler.
-# EmptyFilter: remove sentence with no annotation.
-# SequenceLengthFilter: limit min/max sequence length.
-# FrequencyBasedMonosemousEntitySampler: limit number of occurence
+# we also recommend EmptyFilter and SenseFrequencyBasedEntitySampler.
+# EmptyFilter: remove sentences with no annotation.
+# SenseFrequencyBasedEntitySampler: downsample most similar senses.
 cfg_corpus = {
     "wikitext103": {
         "path": os.path.join(DIR_CORPUS, "wikitext103_train_pos-all.jsonl"),
