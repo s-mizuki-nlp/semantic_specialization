@@ -4,7 +4,7 @@
 import sys, io, os
 from .utils import pick_first_available_path
 from dataset.filter import EmptyFilter, SequenceLengthFilter
-from dataset.transform import FrequencyBasedMonosemousEntitySampler
+from dataset.deprecated import FrequencyBasedMonosemousEntitySampler
 
 DIR_MONO_CORPUS = "/home/sakae/Windows/dataset/word_sense_disambiguation/monosemous_word_annotated_corpus/"
 DIR_EMBEDDINGS = "/home/sakae/Windows/dataset/word_sense_disambiguation/monosemous_word_annotated_corpus/bert_embeddings/"
