@@ -36,6 +36,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                  wsd_evaluation_dataset: Optional[WSDTaskDataset] = None,
                  wsd_evaluation_glosses: Optional[Union[SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset]] = None,
                  max_pool_margin_loss: Optional[MaxPoolingMarginLoss] = None,
+                 coef_sense_embeddings_l2_regularizer: float = 0.0,
                  coef_max_pool_margin_loss: float = 1.0,
                  supervised_alignment_loss: Optional[ContrastiveLoss] = None,
                  coef_supervised_alignment_loss: float = 1.0,
@@ -59,12 +60,13 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         _hparams = {} if hparams is None else hparams
         self.save_hyperparameters(_hparams)
 
-        # set loss functions
+        # set loss functions / coefficients
         self._contrastive_or_triplet_loss = main_loss
         self._max_pool_margin_loss = max_pool_margin_loss
         self._coef_max_pool_margin_loss = coef_max_pool_margin_loss
         self._supervised_alignment_loss = supervised_alignment_loss
         self._coef_supervised_alignment_loss = coef_supervised_alignment_loss
+        self._coef_sense_embeddings_l2_regularizer = coef_sense_embeddings_l2_regularizer
 
         # set optimizers
         self._optimizer_class_name = optimizer_params.pop("class_name")
@@ -205,7 +207,8 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                     print(f"{loss_name}.{property_name}: {current_value:.2f} -> {new_value:.2f}")
 
     def _forward_contrastive_or_triplet_task(self, projection_head: nn.Module, loss_function: Union[ContrastiveLoss, TripletLoss, None],
-                                             query, positive, hard_negatives, num_hard_negatives):
+                                             query, positive, hard_negatives, num_hard_negatives,
+                                             coef_l2_regularizer: float = 0.0):
         if loss_function is None:
             return torch.tensor(0.0, dtype=torch.float, device=query.device)
 
@@ -221,6 +224,11 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         if loss_function.__class__.__name__ == "TripletLoss":
             # multiply 100x so that similar scale to contrastive loss.
             loss = loss * 100
+
+        if coef_l2_regularizer > 0.0:
+            t_diff = _query - query
+            l2_loss = torch.linalg.norm(t_diff, dim=-1, ord=2, keepdim=False).mean() * coef_l2_regularizer
+            loss = loss + l2_loss
 
         return loss
 
@@ -263,7 +271,10 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         # contrastive loss
         task_name = "contrastive"
         assert task_name in batch, f"you must specify '{task_name}' DataLoader."
-        main_loss = self._forward_contrastive_or_triplet_task(projection_head=self._gloss_projection_head, loss_function=self._contrastive_or_triplet_loss, **batch[task_name])
+        main_loss = self._forward_contrastive_or_triplet_task(projection_head=self._gloss_projection_head,
+                                                              loss_function=self._contrastive_or_triplet_loss,
+                                                              coef_l2_regularizer=self._coef_sense_embeddings_l2_regularizer,
+                                                              **batch[task_name])
 
         # (optional) max-pool margin loss
         if self._max_pool_margin_loss is None:
@@ -305,7 +316,10 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
         # contrastive loss
         _batch = batch["contrastive"]
-        contrastive_or_triplet_loss = self._forward_contrastive_or_triplet_task(projection_head=self._gloss_projection_head, loss_function=self._contrastive_or_triplet_loss, **_batch)
+        contrastive_or_triplet_loss = self._forward_contrastive_or_triplet_task(projection_head=self._gloss_projection_head,
+                                                                                loss_function=self._contrastive_or_triplet_loss,
+                                                                                coef_l2_regularizer=0.0,
+                                                                                **_batch)
 
         # contrastive objective related metrics: alignment, uniformity
         _query = self._gloss_projection_head.forward(_batch["query"], is_gloss_embeddings=True)
