@@ -141,8 +141,9 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--coef_max_pool_margin_loss", required=False, type=float, default=1.0, help="Coefficient of max-pooling margin task.")
     parser.add_argument("--sense_annotated_dataset_name", required=False, type=nullable_string, default=None, help="Sense-annotated corpus embeddings dataset name. Specifying it enables supervised alignment task.")
     parser.add_argument("--coef_supervised_alignment_loss", required=False, type=float, default=1.0, help="Coefficient of supervised alignment task.")
-    parser.add_argument("--coef_sense_embeddings_regularizer", required=False, type=float, default=0.0, help="Coefficient of sense embeddings L2 regularization between pre-post specialization.")
-
+    parser.add_argument("--coef_sense_embeddings_regularizer", required=False, type=float, default=0.0, help="Coefficient of sense embeddings distance regularization between pre-post specialization.")
+    parser.add_argument("--sense_embeddings_regularizer_type", required=False, type=str, default="cosine", choices=["l2","cosine"],
+                        help="Distance type applied to the sense embeddings regularization. choice: l2,cosine")
     parser.add_argument("--main_loss_class_name", required=False, type=str, default="ContrastiveLoss", choices=["ContrastiveLoss", "TripletLoss", "None"],
                         help="main loss class name for gloss embeddings specialization.")
     parser.add_argument("--similarity_class_name", required=False, type=str, default="CosineSimilarity", choices=["CosineSimilarity", "DotProductSimilarity", "ArcMarginProduct"],
@@ -427,6 +428,7 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
                                      supervised_alignment_loss=supervised_alignment_loss,
                                      coef_supervised_alignment_loss=args.coef_supervised_alignment_loss,
                                      coef_sense_embeddings_regularizer=args.coef_sense_embeddings_regularizer,
+                                     sense_embeddings_regularizer_type=args.sense_embeddings_regularizer_type,
                                      model_parameter_schedulers=None,
                                      loss_parameter_schedulers=None,
                                      hparams=vars(args))

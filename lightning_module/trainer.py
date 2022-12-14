@@ -37,6 +37,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                  wsd_evaluation_glosses: Optional[Union[SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset]] = None,
                  max_pool_margin_loss: Optional[MaxPoolingMarginLoss] = None,
                  coef_sense_embeddings_regularizer: float = 0.0,
+                 sense_embeddings_regularizer_type: str = "cosine",
                  coef_max_pool_margin_loss: float = 1.0,
                  supervised_alignment_loss: Optional[ContrastiveLoss] = None,
                  coef_supervised_alignment_loss: float = 1.0,
@@ -67,6 +68,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         self._supervised_alignment_loss = supervised_alignment_loss
         self._coef_supervised_alignment_loss = coef_supervised_alignment_loss
         self._coef_sense_embeddings_regularizer = coef_sense_embeddings_regularizer
+        self._sense_embeddings_regularizer_type = sense_embeddings_regularizer_type
 
         # set optimizers
         self._optimizer_class_name = optimizer_params.pop("class_name")
@@ -280,7 +282,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         main_loss = self._forward_contrastive_or_triplet_task(projection_head=self._gloss_projection_head,
                                                               loss_function=self._contrastive_or_triplet_loss,
                                                               coef_sense_embeddings_regularizer=self._coef_sense_embeddings_regularizer,
-                                                              regularizer_type="cosine",
+                                                              regularizer_type=self._sense_embeddings_regularizer_type,
                                                               **batch[task_name])
 
         # (optional) max-pool margin loss
