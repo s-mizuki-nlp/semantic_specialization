@@ -36,7 +36,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
                  wsd_evaluation_dataset: Optional[WSDTaskDataset] = None,
                  wsd_evaluation_glosses: Optional[Union[SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset]] = None,
                  max_pool_margin_loss: Optional[MaxPoolingMarginLoss] = None,
-                 coef_sense_embeddings_l2_regularizer: float = 0.0,
+                 coef_sense_embeddings_regularizer: float = 0.0,
                  coef_max_pool_margin_loss: float = 1.0,
                  supervised_alignment_loss: Optional[ContrastiveLoss] = None,
                  coef_supervised_alignment_loss: float = 1.0,
@@ -66,7 +66,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         self._coef_max_pool_margin_loss = coef_max_pool_margin_loss
         self._supervised_alignment_loss = supervised_alignment_loss
         self._coef_supervised_alignment_loss = coef_supervised_alignment_loss
-        self._coef_sense_embeddings_l2_regularizer = coef_sense_embeddings_l2_regularizer
+        self._coef_sense_embeddings_regularizer = coef_sense_embeddings_regularizer
 
         # set optimizers
         self._optimizer_class_name = optimizer_params.pop("class_name")
@@ -208,7 +208,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
     def _forward_contrastive_or_triplet_task(self, projection_head: nn.Module, loss_function: Union[ContrastiveLoss, TripletLoss, None],
                                              query, positive, hard_negatives, num_hard_negatives,
-                                             coef_l2_regularizer: float = 0.0):
+                                             coef_sense_embeddings_regularizer: float = 0.0, regularizer_type: str = "cosine"):
         if loss_function is None:
             return torch.tensor(0.0, dtype=torch.float, device=query.device)
 
@@ -225,10 +225,16 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
             # multiply 100x so that similar scale to contrastive loss.
             loss = loss * 100
 
-        if coef_l2_regularizer > 0.0:
-            t_diff = _query - query
-            l2_loss = torch.linalg.norm(t_diff, dim=-1, ord=2, keepdim=False).mean() * coef_l2_regularizer
-            loss = loss + l2_loss
+        if coef_sense_embeddings_regularizer > 0.0:
+            if regularizer_type == "l2":
+                t_diff = _query - query
+                n_loss = torch.linalg.norm(t_diff, dim=-1, ord=2, keepdim=False).mean() * coef_sense_embeddings_regularizer
+            elif regularizer_type == "cosine":
+                n_loss = (1.0 - F.cosine_similarity(query, _query, dim=-1)).mean() * coef_sense_embeddings_regularizer
+            else:
+                raise ValueError(f"invalid regularizer type: {regularizer_type}")
+            # cosine distance
+            loss = loss + n_loss
 
         return loss
 
@@ -273,7 +279,8 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         assert task_name in batch, f"you must specify '{task_name}' DataLoader."
         main_loss = self._forward_contrastive_or_triplet_task(projection_head=self._gloss_projection_head,
                                                               loss_function=self._contrastive_or_triplet_loss,
-                                                              coef_l2_regularizer=self._coef_sense_embeddings_l2_regularizer,
+                                                              coef_sense_embeddings_regularizer=self._coef_sense_embeddings_regularizer,
+                                                              regularizer_type="cosine",
                                                               **batch[task_name])
 
         # (optional) max-pool margin loss
@@ -318,7 +325,7 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
         _batch = batch["contrastive"]
         contrastive_or_triplet_loss = self._forward_contrastive_or_triplet_task(projection_head=self._gloss_projection_head,
                                                                                 loss_function=self._contrastive_or_triplet_loss,
-                                                                                coef_l2_regularizer=0.0,
+                                                                                coef_sense_embeddings_regularizer=0.0,
                                                                                 **_batch)
 
         # contrastive objective related metrics: alignment, uniformity
