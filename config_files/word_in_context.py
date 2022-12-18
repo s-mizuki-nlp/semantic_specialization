@@ -36,7 +36,7 @@ cfg_corpus = {
     },
     "MCL-WiC-test": {
         "path_corpus": os.path.join(DIR_DATASET_MCL_WiC, "./test/multilingual/test.en-en.data"),
-        "path_ground_truth_labels": None
+        "path_ground_truth_labels": os.path.join(DIR_DATASET_MCL_WiC, "./test/multilingual/test.en-en.gold")
     }
 }
 
@@ -75,7 +75,7 @@ cfg_tasks = {
         "path_or_bert_embeddings_dataset": os.path.join(DIR_DATASET_MCL_WiC_EMBEDDINGS, "bert-large-cased_MCL-WiC-test.hdf5"),
         "kwargs_bert_embeddings_dataset": {"padding":False, "max_sequence_length": None},
         "copy_field_names_from_record_to_entity": ["sentence_pair_id", "tokenized_sentence", "words", "ground_truth_label"],
-        "description": "Multilingual Word-in-Context task test set for En-En encoded by BERT-large-cased. Ground-truth label is unavailable."
+        "description": "Multilingual Word-in-Context task test set for En-En encoded by BERT-large-cased."
     },
 }
 
