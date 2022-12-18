@@ -259,12 +259,14 @@ class BERTEmbeddings(object):
 
         dict_ret = {
             "embeddings": embeddings,
-            "entity_span_avg_vectors": entity_span_avg_vectors,
             "sequence_lengths": v_seq_length,
             "sequence_spans": v_seq_spans,
             "entity_spans": lst_lst_entity_subword_spans,
             "attention_mask": attention_mask
         }
+        if self._return_context_embeddings_in_entity_only:
+            dict_ret["entity_span_avg_vectors"] = entity_span_avg_vectors
+
         return dict_ret
 
     @property
