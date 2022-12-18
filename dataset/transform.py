@@ -190,7 +190,7 @@ class SenseFrequencyBasedEntitySampler(object):
                 assert os.path.exists(path_sense_freq), f"specified file does not exist: {path_sense_freq}"
                 self._lemma_key_freq = self._load_lemma_key_freq(path=path_sense_freq)
             elif dataset_sense_annotated_corpus is not None:
-                print("counting lemma x pos frequency from dataset.")
+                print("counting sense key frequency from dataset.")
                 self._lemma_key_freq = self._count_lemma_key_freq(dataset=dataset_sense_annotated_corpus,
                                                                   entity_field_name=entity_field_name,
                                                                   lemma_key_field_name=lemma_key_field_name,
@@ -238,6 +238,9 @@ class SenseFrequencyBasedEntitySampler(object):
             dataset.return_record_only = True
 
         for record in dataset:
+            if is_bert_embeddings_dataset:
+                record = record["record"]
+            
             lst_lemma_keys = [entity[lemma_key_field_name] for entity in record[entity_field_name]]
             if is_multiple_senses:
                 lst_lemma_keys = list(itertools.chain(*lst_lemma_keys))
