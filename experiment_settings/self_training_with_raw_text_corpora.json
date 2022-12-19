@@ -18,7 +18,12 @@
     "num_hard_negatives": 5
   },
   "use_positives_as_in_batch_negatives": true,
-  "context_dataset_name": "SemCor+OMSTI-bert-large-cased",
+  "context_dataset_name": "wikitext103-bert-large-cased",
+  "cfg_context_dataset_neighbor_sense_sampler": {
+    "min_freq": 1,
+    "max_freq": 10,
+    "enable_random_sampling": true
+  },
   "coef_max_pool_margin_loss": 0.2,
   "cfg_max_pool_margin_loss": {
     "label_threshold": 0.0,

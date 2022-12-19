@@ -42,7 +42,7 @@ cfg_embeddings = {
         "is_context_embeddings_in_entity_only": True,
         "description": "BERT-large-cased. sample dataset for development purpose."
     },
-    "wikitext103": {
+    "wikitext103-bert-large-cased": {
         "path":pick_first_available_path(
             os.path.join(DIR_LOCAL, "wikitext103_train_bert-large-cased.hdf5"),
             os.path.join(DIR_EMBEDDINGS, "wikitext103_train_bert-large-cased.hdf5"),
@@ -53,7 +53,7 @@ cfg_embeddings = {
         "is_context_embeddings_in_entity_only": True,
         "description": "BERT-large-cased. Wikitext-103 trainset, context-sense similarity added, length=6~128."
     },
-    "wiki40b_first_paragraph": {
+    "wiki40b_first_paragraph-bert-large-cased": {
         "path":pick_first_available_path(
             os.path.join(DIR_LOCAL, "wiki40b_train_first_paragraph_bert-large-cased.hdf5"),
             os.path.join(DIR_EMBEDDINGS, "wiki40b_train_first_paragraph_bert-large-cased.hdf5"),

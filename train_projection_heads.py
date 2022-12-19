@@ -21,14 +21,13 @@
 # * Collate Function: ContrastiveDatasetEmbeddingsCollateFunction
 # 
 # ### Max-Pooling margin loss
-# * In-Context embeddings: sense_annotated_corpus.cfg_evaluation, sense_annotated_corpus.cfg_training, monosemous_corpus.cfg_training
-#     * monosemous_corpus.cfg_training は要整備
-# * Dataset: {BERTEmbeddingsDataset -> WSDTaskDataset}, xLemmaEmbeddingsDataset
-# * Collate Funciton: GlossContextSimilarityTaskEmbeddingsCollateFunction
+# * In-Context embeddings: sense_annotated_corpus.cfg_evaluation, sense_annotated_corpus.cfg_training, raw_text_corpus.cfg_embeddings
+# * Dataset: {BERTEmbeddingsDataset(+SenseFrequencyBasedEntitySampler, EmptyFilter) -> WSDTaskDataset}, xLemmaEmbeddingsDataset
+# * Downsampler: SenseFrequencyBasedEntitySampler exclusive for raw_text_corpus.cfg_embeddings
+# * Collate Function: GlossContextSimilarityTaskEmbeddingsCollateFunction
 # 
-# ### Supervised Alignment loss
+# ### Future works: Supervised Alignment loss
 # * Sense-annotated corpus context embeddings: sense_annotated_corpus.cfg_training
-#     * 単義語コーパス(monosemous_corpus.cfg_training)は使用できない．cross-entropy lossがゼロになるため．
 # * Dataset: BERTEmbeddingsDataset -> WSDTaskDataset
 # * Collate Function: SupervisedGlossContextAlignmentTaskEmbeddingsCollateFunction
 # 
@@ -65,7 +64,7 @@ from lightning_module.trainer import FrozenBERTWSDTaskTrainer
 from lightning_module import custom_collate_fn
 
 from config_files.wsd_task import cfg_task_dataset
-from config_files import sense_annotated_corpus, monosemous_corpus, wordnet_gloss_corpus
+from config_files import sense_annotated_corpus, raw_text_corpus, wordnet_gloss_corpus
 
 from dataset.contextualized_embeddings import BERTEmbeddingsDataset
 from dataset.gloss_embeddings import SREFLemmaEmbeddingsDataset, BERTLemmaEmbeddingsDataset
@@ -113,6 +112,12 @@ def _default_configs():
             # "accumulate_grad_batches":None,
             # "gradient_clip_val":1.0
             "progress_bar_refresh_rate": 20
+        },
+        # Raw-text corpora based context embeddings dataset filter
+        "cfg_context_dataset_neighbor_sense_sampler": {
+            "min_freq": None,
+            "max_freq": None,
+            "enable_random_sampling": False
         }
     }
 
@@ -141,7 +146,6 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--coef_max_pool_margin_loss", required=False, type=float, default=1.0, help="Coefficient of max-pooling margin task.")
     parser.add_argument("--sense_annotated_dataset_name", required=False, type=nullable_string, default=None, help="Sense-annotated corpus embeddings dataset name. Specifying it enables supervised alignment task.")
     parser.add_argument("--coef_supervised_alignment_loss", required=False, type=float, default=1.0, help="Coefficient of supervised alignment task.")
-
     parser.add_argument("--main_loss_class_name", required=False, type=str, default="ContrastiveLoss", choices=["ContrastiveLoss", "TripletLoss", "None"],
                         help="main loss class name for gloss embeddings specialization.")
     parser.add_argument("--similarity_class_name", required=False, type=str, default="CosineSimilarity", choices=["CosineSimilarity", "DotProductSimilarity", "ArcMarginProduct"],
@@ -168,7 +172,7 @@ def _parse_args(exclude_required_arguments: bool = False):
                             help="context projection head class name. SHARED: share with gloss projection head. COPY: copy initial model parameter from gloss projection head.")
 
     lst_config_names = ("cfg_contrastive_learning_dataset", "cfg_gloss_projection_head", "cfg_context_projection_head", "cfg_similarity_class",
-                        "cfg_max_pool_margin_loss", "cfg_optimizer", "cfg_trainer")
+                        "cfg_max_pool_margin_loss", "cfg_optimizer", "cfg_trainer", "cfg_context_dataset_neighbor_sense_sampler")
     for config_name in lst_config_names:
         parser.add_argument(f"--{config_name}", required=False, type=nullable_json_loads, default=json.dumps(default_configs[config_name]))
 
@@ -192,7 +196,7 @@ def _postprocess_args(args):
     print("=== overwrite default configurations ===")
     default_configs = _default_configs()
     lst_config_names = ("cfg_contrastive_learning_dataset", "cfg_gloss_projection_head", "cfg_context_projection_head", "cfg_similarity_class",
-                                                "cfg_max_pool_margin_loss", "cfg_optimizer", "cfg_trainer")
+                        "cfg_max_pool_margin_loss", "cfg_optimizer", "cfg_trainer", "cfg_context_dataset_neighbor_sense_sampler")
     for config_name in lst_config_names:
         cfg_input = args.__dict__[config_name]
         cfg_default = copy.deepcopy(default_configs[config_name])
@@ -243,7 +247,7 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         pprint("=== contrastive task dataset ===")
         pprint(contrastive_dataset.verbose)
 
-    ## (Optional) BERT Embeddings Dataset for Max-Pooling-Margin Task
+    ## (Optional) BERT Embeddings Dataset for self-training (previously written as max-pooling-margin) Task
     context_dataset_name = args.context_dataset_name
     if context_dataset_name is None:
         max_pool_margin_dataset = None
@@ -257,9 +261,20 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
             if _context_dataset_name in sense_annotated_corpus.cfg_training:
                 _context_dataset = BERTEmbeddingsDataset(**sense_annotated_corpus.cfg_training[_context_dataset_name])
                 _max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=_context_dataset, **cfg_task_dataset["WSD"])
-            elif _context_dataset_name in monosemous_corpus.cfg_embeddings:
-                _context_dataset = BERTEmbeddingsDataset(**monosemous_corpus.cfg_embeddings[_context_dataset_name])
-                _max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=_context_dataset, **cfg_task_dataset["TrainOnMonosemousCorpus"])
+            elif _context_dataset_name in raw_text_corpus.cfg_embeddings:
+                _cfg = copy.deepcopy(raw_text_corpus.cfg_embeddings[_context_dataset_name])
+                # setup neighbor sense downsampler
+                pprint("=== Neighbor sense based context dataset sampler ===")
+                pprint(args.cfg_context_dataset_neighbor_sense_sampler)
+                path_sense_freq = _cfg.pop("path_sense_freq", None)
+                if path_sense_freq is not None:
+                    dict_filter_and_transformer = raw_text_corpus.setup_neighbor_sense_downsampler(path_sense_freq=path_sense_freq,
+                                                                                                   **args.cfg_context_dataset_neighbor_sense_sampler)
+                else:
+                    warnings.warn(f"Skip filter because neighbor sense frequency information is not available.")
+                    dict_filter_and_transformer = {}
+                _context_dataset = BERTEmbeddingsDataset(**_cfg, **dict_filter_and_transformer)
+                _max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=_context_dataset, **cfg_task_dataset["TrainOnRawTextCorpus"])
             else:
                 raise ValueError(f"invalid context dataset name: {context_dataset_name}")
             lst_max_pool_margin_datasets.append(_max_pool_margin_dataset)
