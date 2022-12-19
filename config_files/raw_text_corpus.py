@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
-
+import warnings
 from typing import Optional
 
 import sys, io, os
@@ -47,7 +47,7 @@ cfg_embeddings = {
             os.path.join(DIR_LOCAL, "wikitext103_train_bert-large-cased.hdf5"),
             os.path.join(DIR_EMBEDDINGS, "wikitext103_train_bert-large-cased.hdf5"),
         ),
-        "path_sense_freq": None,
+        "path_sense_freq": os.path.join(DIR_EMBEDDINGS, "wikitext103_train_bert-large-cased.hdf5.sense_freq.json"),
         "padding": False,
         "max_sequence_length": None,
         "is_context_embeddings_in_entity_only": True,
@@ -58,7 +58,7 @@ cfg_embeddings = {
             os.path.join(DIR_LOCAL, "wiki40b_train_first_paragraph_bert-large-cased.hdf5"),
             os.path.join(DIR_EMBEDDINGS, "wiki40b_train_first_paragraph_bert-large-cased.hdf5"),
         ),
-        "path_sense_freq": None,
+        "path_sense_freq": os.path.join(DIR_EMBEDDINGS, "wiki40b_train_first_paragraph_bert-large-cased.hdf5.sense_freq.json"),
         "padding": False,
         "max_sequence_length": None,
         "is_context_embeddings_in_entity_only": True,
@@ -67,7 +67,7 @@ cfg_embeddings = {
 }
 
 def setup_neighbor_sense_downsampler(path_sense_freq: str,
-                                     min_freq: Optional[int] = 1, max_freq: Optional[int] = 10,
+                                     min_freq: Optional[int] = None, max_freq: Optional[int] = None,
                                      enable_random_sampling: bool = True,
                                      entity_field_name: str = "record.entities",
                                      lemma_key_field_name: str = "most_similar_sense_lemma_key",
@@ -88,6 +88,10 @@ def setup_neighbor_sense_downsampler(path_sense_freq: str,
     Returns: SenseFrequencyBasedEntitySamplerとEmptyFilterのDict
 
     """
+    if (min_freq is None) and (max_freq is None):
+        warnings.warn(f"Both min_freq and max_freq are not specified. We will skip neighbor sense downsampler.")
+        return {}
+
     entity_sampler = SenseFrequencyBasedEntitySampler(
         path_sense_freq=path_sense_freq,
         min_freq=min_freq, max_freq=max_freq, enable_random_sampling=enable_random_sampling, random_seed=42,
