@@ -5,6 +5,7 @@ from typing import Dict, Callable, List, Optional
 import sys, io, os, json
 from collections import defaultdict, Counter
 import itertools
+import pydash
 
 import numpy as np
 from torch.utils.data import Dataset
@@ -169,7 +170,7 @@ class SenseFrequencyBasedEntitySampler(object):
                  path_sense_freq: Optional[str] = None,
                  dataset_sense_annotated_corpus: Optional[Dataset] = None,
                  enable_random_sampling: bool = True,
-                 entity_field_name: str = "entities",
+                 entity_field_name: str = "record.entities",
                  lemma_key_field_name: str = "most_similar_sense_lemma_key",
                  is_multiple_senses: bool = False,
                  random_seed: int = 42
@@ -238,10 +239,7 @@ class SenseFrequencyBasedEntitySampler(object):
             dataset.return_record_only = True
 
         for record in dataset:
-            if is_bert_embeddings_dataset:
-                record = record["record"]
-            
-            lst_lemma_keys = [entity[lemma_key_field_name] for entity in record[entity_field_name]]
+            lst_lemma_keys = [entity[lemma_key_field_name] for entity in pydash.get(record, entity_field_name)]
             if is_multiple_senses:
                 lst_lemma_keys = list(itertools.chain(*lst_lemma_keys))
             cnt.update(lst_lemma_keys)

@@ -7,6 +7,7 @@ from __future__ import print_function
 
 
 from typing import Optional, Dict, Set, List
+import pydash
 
 
 class DictionaryFilter(object):
@@ -36,11 +37,18 @@ class DictionaryFilter(object):
 class EmptyFilter(object):
 
     def __init__(self, check_field_names: List[str]):
+        """
+        指定したフィールドの配列が空のレコードを除外するフィルタ．
+
+        Args:
+            check_field_names: フィールド名のリスト．nested fieldも指定可能．例： `record.entities`
+        """
         self._check_field_names = check_field_names
 
     def __call__(self, sample: Dict[str, str]):
         for field_name in self._check_field_names:
-            if len(sample[field_name]) == 0:
+            entry = pydash.get(sample, field_name)
+            if len(entry) == 0:
                 return True
         return False
 

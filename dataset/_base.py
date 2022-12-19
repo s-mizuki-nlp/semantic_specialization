@@ -6,6 +6,7 @@ import os
 from typing import Optional, Union, Callable, List, Any, Dict
 from abc import ABCMeta, abstractmethod
 
+import pydash
 from torch.utils.data import IterableDataset
 
 from dataset_preprocessor import utils
@@ -23,7 +24,7 @@ class AbstractFormatDataset(metaclass=ABCMeta):
 
         :param path: NDJSONファイルのパス
         :param n_rows: 読み込む最大レコード数
-        :param transform_functions: データ変形定義，Dictionaryを指定．keyはフィールド名，valueは変形用関数
+        :param transform_functions: データ変形定義，Dictionaryを指定．keyはフィールド名，valueは変形用関数．nestedなフィールド名はピリオドで連結．例： `record.entities`
         :param filter_function: 除外するか否かを判定する関数
         :param description: 説明
         """
@@ -94,7 +95,9 @@ class AbstractFormatDataset(metaclass=ABCMeta):
             else:
                 transform_function = transform_function_or_dict
                 source_field_name = target_field_name
-            entry[target_field_name] = transform_function(entry[source_field_name])
+            function_input = pydash.get(entry, source_field_name)
+            function_output = transform_function(function_input)
+            entry = pydash.set_(entry, target_field_name, function_output)
 
         return entry
 
