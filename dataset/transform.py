@@ -173,7 +173,7 @@ class SenseFrequencyBasedEntitySampler(object):
                  entity_field_name: str = "record.entities",
                  lemma_key_field_name: str = "most_similar_sense_lemma_key",
                  is_multiple_senses: bool = False,
-                 random_seed: int = 42
+                 random_seed: Optional[int] = None
                  ):
         """
         語義をsamplingする．指定頻度未満の語義は削除，指定頻度以上の語義はdown-samplingする．

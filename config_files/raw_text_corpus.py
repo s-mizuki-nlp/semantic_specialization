@@ -94,7 +94,7 @@ def setup_neighbor_sense_downsampler(path_sense_freq: str,
 
     entity_sampler = SenseFrequencyBasedEntitySampler(
         path_sense_freq=path_sense_freq,
-        min_freq=min_freq, max_freq=max_freq, enable_random_sampling=enable_random_sampling, random_seed=42,
+        min_freq=min_freq, max_freq=max_freq, enable_random_sampling=enable_random_sampling, random_seed=None,
         entity_field_name=entity_field_name, lemma_key_field_name=lemma_key_field_name, is_multiple_senses=is_multiple_senses
     )
 
