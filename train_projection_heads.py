@@ -245,8 +245,11 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         gloss_dataset = SREFLemmaEmbeddingsDataset(**_cfg)
 
     ## calculate training step size.
-    if (args.limit_train_batches is None) and (args.multiple_trainloader_mode == "max_size_cycle"):
-        limit_train_batches = math.ceil(len(gloss_dataset) / args.batch_size_contrastive)
+    if args.limit_train_batches is None:
+        if args.multiple_trainloader_mode == "max_size_cycle":
+            limit_train_batches = math.ceil(len(gloss_dataset) / args.batch_size_contrastive)
+        else:
+            limit_train_batches = 1.0
         args.__setattr__("limit_train_batches", limit_train_batches)
         warnings.warn(f"Adjusted limit_train_batches: {limit_train_batches}")
 
