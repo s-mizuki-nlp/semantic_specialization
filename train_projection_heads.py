@@ -162,7 +162,7 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--batch_size_max_pool_margin", required=False, type=int, default=None, help="max-pool margin task batch size.")
     parser.add_argument("--batch_size_supervised_alignment", required=False, type=int, default=None, help="supervised alignment task batch size.")
     parser.add_argument("--max_epochs", required=False, type=int, default=10, help="max. number of epochs.")
-    parser.add_argument("--limit_train_batches", required=False, type=int, default=None, help="max. number of steps for each training. DEFAULT: None OR #senses / batch_size_contrastive if multiple_trainer_mode = max_size_cycle")
+    parser.add_argument("--max_steps", required=False, type=int, default=-1, help="max. number of steps for whole training. DEFAULT: Disabled(-1) OR #sense_steps * max_epochs if multiple_trainloader_mode = max_size_cycle")
     parser.add_argument("--multiple_trainloader_mode", required=False, type=str, default="min_size", choices=["max_size_cycle", "min_size"], help="multiple trainloader mode. passed to CombinedLoader(...). DEFAULT:min_size")
     parser.add_argument("--shuffle", required=False, default=True, help="shuffle trainset.")
     parser.add_argument("--num_workers", required=False, type=int, default=0, help="Not available yet.")
@@ -243,15 +243,6 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         gloss_dataset = BERTLemmaEmbeddingsDataset(**_cfg)
     else:
         gloss_dataset = SREFLemmaEmbeddingsDataset(**_cfg)
-
-    ## calculate training step size.
-    if args.limit_train_batches is None:
-        if args.multiple_trainloader_mode == "max_size_cycle":
-            limit_train_batches = math.ceil(len(gloss_dataset) / args.batch_size_contrastive)
-        else:
-            limit_train_batches = 1.0
-        args.__setattr__("limit_train_batches", limit_train_batches)
-        warnings.warn(f"Adjusted limit_train_batches: {limit_train_batches}")
 
     ## Contrastive Task Dataset
     contrastive_dataset = ContrastiveLearningDataset(gloss_dataset=gloss_dataset, **args.cfg_contrastive_learning_dataset)
@@ -415,6 +406,15 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
         batch = next(iter(data_loader))
         print(f"{task_name}:{batch.keys()}")
 
+    ## automatic adjustment of trainer
+    if args.multiple_trainloader_mode == "max_size_cycle":
+        if args.max_steps is None:
+            n_gloss_dataset = len(train_data_loaders["contrastive"])
+            max_steps = n_gloss_dataset * args.max_epochs
+            args.__setattr__("max_steps", max_steps)
+            warnings.warn(f"configured max_steps: {max_steps} = {n_gloss_dataset} x {args.max_epochs}")
+            args.__setattr__("max_epochs", -1)
+
     train_data_loader = CombinedLoader(train_data_loaders, mode=args.multiple_trainloader_mode)
 
     ## validation dataloaders
@@ -465,7 +465,7 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
                         log_every_n_steps=args.log_every_n_steps,
                         flush_logs_every_n_steps=args.log_every_n_steps,
                         max_epochs=args.max_epochs,
-                        limit_train_batches=args.limit_train_batches,
+                        max_steps=args.max_steps,
                         gpus=args.gpus,
                         **args.cfg_trainer
                        )
