@@ -18,8 +18,7 @@
     "num_hard_negatives": 5
   },
   "use_positives_as_in_batch_negatives": true,
-  "context_dataset_name": "SemCor-bert-large-cased",
-  "multiple_trainloader_mode": "min_size",
+  "context_dataset_name": "SemCor+OMSTI-bert-large-cased",
   "coef_max_pool_margin_loss": 0.2,
   "cfg_max_pool_margin_loss": {
     "label_threshold": 0.0,
