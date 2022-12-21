@@ -408,7 +408,7 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
 
     ## automatic adjustment of trainer
     if args.multiple_trainloader_mode == "max_size_cycle":
-        if args.max_steps is None:
+        if args.max_steps == -1:
             n_gloss_dataset = len(train_data_loaders["contrastive"])
             max_steps = n_gloss_dataset * args.max_epochs
             args.__setattr__("max_steps", max_steps)
