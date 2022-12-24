@@ -35,7 +35,7 @@ def objective(trial: optuna.Trial):
         "name": env_name,
         "gloss_dataset_name": "SREF_basic_lemma_embeddings_without_augmentation",
         "eval_dataset_task_name": "WSD-SemEval2007",
-        "max_epochs": 15,
+        "max_epochs": trial.suggest_categorical("max_epochs", choices=[15,20,25]),
         "log_every_n_steps": 500,
         "shuffle": True
     }
@@ -46,10 +46,13 @@ def objective(trial: optuna.Trial):
     # context dataset downsampler
     cfg_context_dataset_neighbor_sense_sampler = {
         "min_freq": None,
-        "max_freq": trial.suggest_categorical("max_freq", choices=[1,3,10,30,100,None]),
+        "max_freq": trial.suggest_categorical("max_freq", choices=[3,5,10,30,50,100,None]),
         "enable_random_sampling": True,
     }
     dict_args["cfg_context_dataset_neighbor_sense_sampler"] = cfg_context_dataset_neighbor_sense_sampler
+
+    # iterate over context dataset
+    dict_args["multiple_trainloader_mode"] = "max_size_cycle"
 
     # always use cosine similarity module
     similarity_class_name = "CosineSimilarity"
@@ -57,7 +60,6 @@ def objective(trial: optuna.Trial):
     # optimization
     batch_size = 256
     dict_args["val_check_interval"] = int(1000 * 128 / batch_size)
-    dict_args["max_epochs"] = 15
     dict_args["batch_size"] = batch_size
 
     # contrastive task に関する条件付け
