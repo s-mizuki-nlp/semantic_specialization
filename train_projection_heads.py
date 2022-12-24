@@ -409,11 +409,11 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
     ## automatic adjustment of trainer
     if args.multiple_trainloader_mode == "max_size_cycle":
         if args.max_steps == -1:
-            n_gloss_dataset_steps = math.ceil(len(train_data_loaders["contrastive"].dataset) / args.batch_size_contrastive)
+            n_gloss_dataset_steps = len(train_data_loaders["contrastive"])
             max_steps = n_gloss_dataset_steps * args.max_epochs
             args.__setattr__("max_steps", max_steps)
             warnings.warn(f"configured max_steps: {max_steps} = {n_gloss_dataset_steps} x {args.max_epochs}")
-            args.__setattr__("max_epochs", -1)
+            args.__setattr__("max_epochs", None)
 
     train_data_loader = CombinedLoader(train_data_loaders, mode=args.multiple_trainloader_mode)
 

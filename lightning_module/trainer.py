@@ -254,9 +254,9 @@ class FrozenBERTWSDTaskTrainer(LightningModule):
 
     def training_step(self, batch: Dict[str, Dict[str, torch.Tensor]], batch_idx: int):
 
-        current_step = self.trainer.global_step / (self.trainer.max_epochs * self.trainer.num_training_batches)
-        self._update_model_parameters(current_step, verbose=False)
-        self._update_loss_parameters(current_step, verbose=False)
+        # current_step = self.trainer.global_step / (self.trainer.max_epochs * self.trainer.num_training_batches)
+        # self._update_model_parameters(current_step, verbose=False)
+        # self._update_loss_parameters(current_step, verbose=False)
 
         # forward computation
 
