@@ -35,7 +35,7 @@ def objective(trial: optuna.Trial):
         "name": env_name,
         "gloss_dataset_name": "SREF_basic_lemma_embeddings_without_augmentation",
         "eval_dataset_task_name": "WSD-SemEval2007",
-        "max_epochs": trial.suggest_categorical("max_epochs", choices=[15,20,25]),
+        "max_epochs": trial.suggest_categorical("max_epochs", choices=[15,20,30]),
         "log_every_n_steps": 500,
         "shuffle": True
     }
@@ -46,10 +46,13 @@ def objective(trial: optuna.Trial):
     # context dataset downsampler
     cfg_context_dataset_neighbor_sense_sampler = {
         "min_freq": None,
-        "max_freq": trial.suggest_categorical("max_freq", choices=[3,5,10,30,50,100,None]),
+        "max_freq": trial.suggest_categorical("max_freq", choices=[3,5,10,30,50,100,300,None]),
         "enable_random_sampling": True,
     }
     dict_args["cfg_context_dataset_neighbor_sense_sampler"] = cfg_context_dataset_neighbor_sense_sampler
+    if cfg_context_dataset_neighbor_sense_sampler["max_freq"] is not None:
+        if cfg_context_dataset_neighbor_sense_sampler["max_freq"] <= 10:
+            dict_args["shuffle_context_dataset"] = False
 
     # iterate over context dataset
     dict_args["multiple_trainloader_mode"] = "max_size_cycle"
