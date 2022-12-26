@@ -51,7 +51,7 @@ def objective(trial: optuna.Trial):
     }
     dict_args["cfg_context_dataset_neighbor_sense_sampler"] = cfg_context_dataset_neighbor_sense_sampler
     if cfg_context_dataset_neighbor_sense_sampler["max_freq"] is not None:
-        if cfg_context_dataset_neighbor_sense_sampler["max_freq"] <= 10:
+        if cfg_context_dataset_neighbor_sense_sampler["max_freq"] <= 50:
             dict_args["shuffle_context_dataset"] = False
 
     # iterate over context dataset
