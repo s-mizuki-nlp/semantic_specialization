@@ -162,7 +162,7 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--batch_size_max_pool_margin", required=False, type=int, default=None, help="max-pool margin task batch size.")
     parser.add_argument("--batch_size_supervised_alignment", required=False, type=int, default=None, help="supervised alignment task batch size.")
     parser.add_argument("--max_epochs", required=False, type=int, default=10, help="max. number of epochs.")
-    parser.add_argument("--max_steps", required=False, type=int, default=-1, help="max. number of steps for whole training. DEFAULT: Disabled(-1) OR #sense_steps * max_epochs if multiple_trainloader_mode = max_size_cycle")
+    parser.add_argument("--max_steps", required=False, type=int, default=None, help="max. number of steps for whole training. DEFAULT: Disabled(None) OR #sense_steps * max_epochs if multiple_trainloader_mode = max_size_cycle")
     parser.add_argument("--multiple_trainloader_mode", required=False, type=str, default="min_size", choices=["max_size_cycle", "min_size"], help="multiple trainloader mode. passed to CombinedLoader(...). DEFAULT:min_size")
     parser.add_argument("--shuffle", required=False, default=True, help="shuffle trainset.")
     parser.add_argument("--num_workers", required=False, type=int, default=0, help="Not available yet.")
@@ -408,7 +408,7 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
 
     ## automatic adjustment of trainer
     if args.multiple_trainloader_mode == "max_size_cycle":
-        if args.max_steps == -1:
+        if args.max_steps is None:
             n_gloss_dataset_steps = len(train_data_loaders["contrastive"])
             max_steps = n_gloss_dataset_steps * args.max_epochs
             args.__setattr__("max_steps", max_steps)
