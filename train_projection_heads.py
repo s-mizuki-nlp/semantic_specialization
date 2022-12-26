@@ -165,6 +165,7 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--max_steps", required=False, type=int, default=None, help="max. number of steps for whole training. DEFAULT: Disabled(None) OR #sense_steps * max_epochs if multiple_trainloader_mode = max_size_cycle")
     parser.add_argument("--multiple_trainloader_mode", required=False, type=str, default="min_size", choices=["max_size_cycle", "min_size"], help="multiple trainloader mode. passed to CombinedLoader(...). DEFAULT:min_size")
     parser.add_argument("--shuffle", required=False, default=True, help="shuffle trainset.")
+    parser.add_argument("--shuffle_context_dataset", required=False, default=None, help="Shuffle context dataset. DEFAULT: same as `shuffle` (None)")
     parser.add_argument("--num_workers", required=False, type=int, default=0, help="Not available yet.")
     parser.add_argument("--name", required=False, type=str, default=None, help=f"name of the model checkpoints. if no specified, {PLATFORM_NAME}")
     parser.add_argument("--version", required=False, type=nullable_string, default=None, help="model checkpoint version. if no specified, auto increment.")
@@ -380,27 +381,33 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
 
     ### train dataloaders
     train_data_loaders = {}
+    if args.shuffle_context_dataset is None:
+        args.__setattr__("shuffle_context_dataset", args.shuffle)
+    else:
+        warnings.warn(f"We will follow `shuffle_context_dataset` argument: {args.shuffle_context_dataset}")
     dict_task_and_datasets = {
         "contrastive": {
             "dataset": contrastive_dataset,
             "gloss_dataset": None,
-            "batch_size": args.batch_size_contrastive
+            "batch_size": args.batch_size_contrastive,
+            "shuffle": args.shuffle
         },
         "max_pool_margin": {
             "dataset": max_pool_margin_dataset,
             "gloss_dataset": gloss_dataset,
-            "batch_size": args.batch_size_max_pool_margin
+            "batch_size": args.batch_size_max_pool_margin,
+            "shuffle": args.shuffle_context_dataset
         },
         "supervised_alignment": {
             "dataset": supervised_alignment_dataset,
             "gloss_dataset": gloss_dataset,
-            "batch_size": args.batch_size_supervised_alignment
+            "batch_size": args.batch_size_supervised_alignment,
+            "shuffle": args.shuffle
         }
     }
     for task_name, datasets in dict_task_and_datasets.items():
         if datasets["dataset"] is not None:
-            train_data_loaders[task_name] = custom_collate_fn.setup_data_loader(task_name=task_name, shuffle=args.shuffle, device=args.device,
-                                                                                **datasets)
+            train_data_loaders[task_name] = custom_collate_fn.setup_data_loader(task_name=task_name, device=args.device, **datasets)
 
     for task_name, data_loader in train_data_loaders.items():
         batch = next(iter(data_loader))
