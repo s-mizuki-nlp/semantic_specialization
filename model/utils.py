@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
+from typing import Optional
 import torch
 from torch.nn.functional import pdist, normalize
 
@@ -24,9 +25,12 @@ def masked_average(embeddings: torch.Tensor, sequence_mask: torch.BoolTensor, di
 
     return t_mean
 
-def _reduction(losses: torch.Tensor, reduction: str):
+def _reduction(losses: torch.Tensor, reduction: str, num_samples: Optional[int] = None):
     if reduction == "mean":
-        return torch.mean(losses)
+        if num_samples is None:
+            return torch.mean(losses)
+        else:
+            return torch.sum(losses) / num_samples
     elif reduction == "sum":
         return torch.sum(losses)
     elif reduction == "none":
