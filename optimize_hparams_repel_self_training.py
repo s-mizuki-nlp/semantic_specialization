@@ -65,10 +65,10 @@ def objective(trial: optuna.Trial):
             return 0.0
 
     # max-pool margin task に関する条件付け．
-    dict_args["coef_max_pool_margin_loss"] = trial.suggest_uniform("coef_max_pool_margin_loss", low=0.1, high=0.5)
+    dict_args["coef_max_pool_margin_loss"] = trial.suggest_loguniform("coef_max_pool_margin_loss", low=0.01, high=0.5)
     dict_args["cfg_max_pool_margin_loss"] = {
         "top_k": 1,
-        "repel_top_k": trial.suggest_categorical("repel_top_k", [None,2,3,5,100,-1,-2,-3])
+        "repel_top_k": trial.suggest_categorical("repel_top_k", [2,3,5,100,-1,-2,-3])
     }
 
     # gloss/context projection head
