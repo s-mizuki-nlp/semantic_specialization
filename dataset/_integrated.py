@@ -48,15 +48,19 @@ class WSDTaskDataset(IterableDataset):
         elif not isinstance(filter_function, list):
             self._filter_function = [filter_function]
 
+        # configure max_dataset_size and n_records
+        self._n_records = self.count_records()
         if max_dataset_size is None:
             self._max_dataset_size = float("inf")
         elif isinstance(max_dataset_size, float):
             if max_dataset_size < 1.0:
-                self._max_dataset_size = int(self.__len__() * max_dataset_size)
+                self._max_dataset_size = int(self._n_records * max_dataset_size)
+                self._n_records = self._max_dataset_size
             else:
                 self._max_dataset_size = float("inf")
         elif isinstance(max_dataset_size, int):
-            self._max_dataset_size = max_dataset_size
+            self._max_dataset_size = min(max_dataset_size, self._n_records)
+            self._n_records = self._max_dataset_size
         else:
             raise ValueError(f"`max_dataset_size` must be either float (ratio) or int (size): {max_dataset_size}")
 
@@ -213,7 +217,7 @@ class WSDTaskDataset(IterableDataset):
             for exclude_field in self._excludes:
                 _ = record.pop(exclude_field, None)
             yield record
-            if idx >= self._max_dataset_size:
+            if (idx+1) >= self._max_dataset_size:
                 break
 
     def __len__(self):
