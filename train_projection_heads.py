@@ -144,6 +144,7 @@ def _parse_args(exclude_required_arguments: bool = False):
     parser.add_argument("--dev_dataset_task_name", required=False, type=str, default="WSD-SemEval2007", help="Development dataset task name.")
     parser.add_argument("--gloss_dataset_name", required=False, type=str, default="SREF_basic_lemma_embeddings", help="Gloss embeddings dataset name.")
     parser.add_argument("--context_dataset_name", required=False, type=nullable_string, default=None, help="Context embeddings dataset name(s). Multiple names with comma delimiter can be specified. Specifying it enables max-pooling margin task.")
+    parser.add_argument("--context_dataset_portion", required=False, type=float, default=None, help="Specifies context embeddings dataset portion. If speified, first r portion alone is used. DEFAULT: None")
     parser.add_argument("--coef_max_pool_margin_loss", required=False, type=float, default=1.0, help="Coefficient of max-pooling margin task.")
     parser.add_argument("--sense_annotated_dataset_name", required=False, type=nullable_string, default=None, help="Sense-annotated corpus embeddings dataset name. Specifying it enables supervised alignment task.")
     parser.add_argument("--coef_supervised_alignment_loss", required=False, type=float, default=1.0, help="Coefficient of supervised alignment task.")
@@ -262,9 +263,12 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
     else:
         lst_max_pool_margin_datasets = []
         for _context_dataset_name in context_dataset_name.split(","):
+            if args.context_dataset_portion is not None:
+                warnings.warn(f"We use {args.context_dataset_portion:1.1%} of {_context_dataset_name} for self-training.")
             if _context_dataset_name in sense_annotated_corpus.cfg_training:
                 _context_dataset = BERTEmbeddingsDataset(**sense_annotated_corpus.cfg_training[_context_dataset_name])
-                _max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=_context_dataset, **cfg_task_dataset["WSD"])
+                _max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=_context_dataset, **cfg_task_dataset["WSD"],
+                                                          max_dataset_size=args.context_dataset_portion)
             elif _context_dataset_name in raw_text_corpus.cfg_embeddings:
                 _cfg = copy.deepcopy(raw_text_corpus.cfg_embeddings[_context_dataset_name])
                 # setup neighbor sense downsampler
@@ -278,7 +282,8 @@ def main(dict_external_args: Optional[Dict[str, Any]] = None, returned_metric: s
                     warnings.warn(f"Skip filter because neighbor sense frequency information is not available.")
                     dict_filter_and_transformer = {}
                 _context_dataset = BERTEmbeddingsDataset(**_cfg, **dict_filter_and_transformer)
-                _max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=_context_dataset, **cfg_task_dataset["TrainOnRawTextCorpus"])
+                _max_pool_margin_dataset = WSDTaskDataset(bert_embeddings_dataset=_context_dataset, **cfg_task_dataset["TrainOnRawTextCorpus"],
+                                                          max_dataset_size=args.context_dataset_portion)
             else:
                 raise ValueError(f"invalid context dataset name: {context_dataset_name}")
             lst_max_pool_margin_datasets.append(_max_pool_margin_dataset)
