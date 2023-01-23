@@ -26,7 +26,8 @@ class WSDTaskDataset(IterableDataset):
                  weighted_average_entity_embeddings_and_sentence_embedding: float = 0.0,
                  normalize_embeddings: bool = False,
                  excludes: Optional[Set[str]] = None,
-                 filter_function: Optional[Union[Callable, List[Callable]]] = None):
+                 filter_function: Optional[Union[Callable, List[Callable]]] = None,
+                 max_dataset_size: Optional[Union[float, int]] = None):
 
         self._has_ground_truth = has_ground_truth
         self._bert_embeddings = bert_embeddings_dataset
@@ -46,6 +47,18 @@ class WSDTaskDataset(IterableDataset):
             self._filter_function = filter_function
         elif not isinstance(filter_function, list):
             self._filter_function = [filter_function]
+
+        if max_dataset_size is None:
+            self._max_dataset_size = float("inf")
+        elif isinstance(max_dataset_size, float):
+            if max_dataset_size < 1.0:
+                self._max_dataset_size = int(self.__len__() * max_dataset_size)
+            else:
+                self._max_dataset_size = float("inf")
+        elif isinstance(max_dataset_size, int):
+            self._max_dataset_size = max_dataset_size
+        else:
+            raise ValueError(f"`max_dataset_size` must be either float (ratio) or int (size): {max_dataset_size}")
 
     def _copy_fields(self, dict_source: Dict[str, Any], dict_target: Dict[str, Any],
                      copy_field_names: Optional[Iterable[str]] = None):
@@ -193,12 +206,15 @@ class WSDTaskDataset(IterableDataset):
             it_records = self._sentence_loader()
         else:
             raise ValueError(f"unknown `return_level` value: {self._return_level}")
-        for record in it_records:
+
+        for idx, record in enumerate(it_records):
             if self._filter(record) == True:
                 continue
             for exclude_field in self._excludes:
                 _ = record.pop(exclude_field, None)
             yield record
+            if idx >= self._max_dataset_size:
+                break
 
     def __len__(self):
         if hasattr(self, "_n_records"):
