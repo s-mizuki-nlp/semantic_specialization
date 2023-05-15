@@ -28,9 +28,10 @@
   * NOTE: This embeddings are computed without using augmented example sentences.
 
 ## Training / Evaluation
-* You can use `batch_train_projection_heads.py`. Usage example can be found in `train_projection_heads.sh`.
-* For multiple trial at once, you can use `batch_training_projection_heads.py`. Default (baseline) arguments can be found in `experiment_settings/baseline.json`.
-* `--help` argument shows the description. The term "max pool margin task" is identical to the self-training objective in the paper.
+* For single trial (run), you can use `train_projection_heads.py`. Usage example can be found in `train_projection_heads.sh`.
+  Also, `--help` argument shows the role of each argument. Note that the term "max pool margin task" is equivalent to the self-training objective in the paper.
+
+* For multiple trial at once, you can use `batch_training_projection_heads.py`. Default (baseline) arguments, which is identical to the experiment setting in our paper, can be found in `experiment_settings/baseline.json`.
 * When finished training, it will save the trained models and evaluation results (if specified).
   * Trained models: `./checkpoints/{name}/version_{version}/checkpoints/last.ckpt`
   * Evaluation result: `{save_eval_metrics}`
