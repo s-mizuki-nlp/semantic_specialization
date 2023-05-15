@@ -7,7 +7,7 @@
 ## Missing codes and objects (as of May. 2023)
 * We will add following codes and objects later. These codes are only available in jupyter notebook format, so far.
 * Pre-computation script of BERT embeddings for context / sense embeddings.
-* ~~Independently executable evaluation script.
+* ~~Independently executable evaluation script.~~
 * Trained models (embeddings transformation functions).
 
 # Contents
