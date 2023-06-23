@@ -1,14 +1,6 @@
-# Under construction
-* This repository is under maintenance for internal use only.
-
-# Word Sense Disambiguation
-* This repostitory is the implementation of the paper "Semantic Specialization for knowledge-based Word Sense Disambiguation."
-
-## Missing codes and objects (as of May. 2023)
-* We will add following codes and objects later. These codes are only available in jupyter notebook format, so far.
-* Pre-computation script of BERT embeddings for context / sense embeddings.
-* ~~Independently executable evaluation script.~~
-* Trained models (embeddings transformation functions).
+# WIP version of "Semantic Specialization for Knowledge-based Word Sense Disambiguation"
+* This repository is intended for internal use only and, as a result, is not well organized and contains experimental or unrelated code snippets.
+* If you are interested in reproducing our study, please refer to the [semantic_specialization_for_wsd](https://github.com/s-mizuki-nlp/semantic_specialization_for_wsd) repository.
 
 # Contents
 
@@ -48,6 +40,6 @@
     year = "2023",
     address = "Dubrovnik, Croatia",
     publisher = "Association for Computational Linguistics",
-    pages = "3449--3462",
+    pages = "3457--3470",
 }
 ```
